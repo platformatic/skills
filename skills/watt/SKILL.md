@@ -40,6 +40,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | Input Pattern | Action |
 |--------------|--------|
 | `init`, `setup`, `integrate`, (empty) | Run **Integration Workflow** |
+| `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -133,6 +134,30 @@ wattpm --version
 Inform the user they can now run:
 - `npm run dev` for development
 - `npm run build && npm run start` for production
+
+---
+
+## Multi-Service Setup
+
+When user requests enterprise/multi-service setup:
+
+1. Read [references/enterprise.md](references/enterprise.md)
+2. Create project structure with:
+   - Root `watt.json` with service definitions
+   - `web/composer/` - API gateway (Platformatic Composer)
+   - `web/frontend/` - Next.js or other frontend
+   - `web/api/` - Fastify API service
+   - `web/db/` - Platformatic DB service (optional)
+3. Configure Composer for path-based routing
+4. Set up inter-service communication via `{service-id}.plt.local`
+
+### Service Communication
+
+Services communicate internally without network overhead:
+```javascript
+// From api service, call db service
+const response = await fetch('http://db.plt.local/users');
+```
 
 ---
 

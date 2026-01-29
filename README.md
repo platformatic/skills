@@ -107,6 +107,18 @@ Generates:
 
 Generates platform-specific configuration files.
 
+### Multi-Service Enterprise Setup
+
+```bash
+/watt enterprise
+/watt multi-service
+```
+
+Creates a multi-service architecture with:
+- Platformatic Composer (API gateway)
+- Multiple backend services
+- Inter-service communication via `{service-id}.plt.local`
+
 ## Supported Frameworks
 
 | Framework | Package | Detection |
