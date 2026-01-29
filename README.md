@@ -8,6 +8,7 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
+- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks
 - **Status Checking**: Verify your Watt setup with a single command
 
 ## Installation

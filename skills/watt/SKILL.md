@@ -41,6 +41,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 |--------------|--------|
 | `init`, `setup`, `integrate`, (empty) | Run **Integration Workflow** |
 | `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
+| `kafka`, `event-driven`, `messaging` | Run **Kafka Integration Setup** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -158,6 +159,25 @@ Services communicate internally without network overhead:
 // From api service, call db service
 const response = await fetch('http://db.plt.local/users');
 ```
+
+---
+
+## Kafka Integration
+
+When user requests Kafka/event-driven setup:
+
+1. Read [references/kafka.md](references/kafka.md)
+2. Choose integration approach:
+   - **@platformatic/kafka**: Direct producer/consumer in your services
+   - **@platformatic/kafka-hooks**: Kafka-to-HTTP webhooks (recommended for Watt)
+3. Create kafka-hooks service with `npx wattpm@latest create`
+4. Configure topics, webhooks, and request/response patterns
+
+### Kafka-Hooks Patterns
+
+- **Webhook**: Kafka messages → HTTP endpoints (with DLQ)
+- **Request/Response**: HTTP → Kafka → HTTP (correlation IDs)
+- **HTTP Publishing**: POST to `/topics/{topicName}`
 
 ---
 
