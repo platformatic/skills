@@ -42,6 +42,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `init`, `setup`, `integrate`, (empty) | Run **Integration Workflow** |
 | `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
 | `kafka`, `event-driven`, `messaging` | Run **Kafka Integration Setup** |
+| `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -158,6 +159,33 @@ Services communicate internally without network overhead:
 ```javascript
 // From api service, call db service
 const response = await fetch('http://db.plt.local/users');
+```
+
+---
+
+## Migration / POC Workflow
+
+When user wants to migrate an existing app or prepare for a POC:
+
+1. Read [references/poc-checklist.md](references/poc-checklist.md)
+2. Verify prerequisites:
+   - Node.js 22.19.0+
+   - Application runs locally
+   - Database/API access available
+3. Install: `npm install wattpm @platformatic/node`
+4. Create `watt.json` with application entrypoint
+5. Modify entrypoint to export `create` function (returns server) or `close` function
+6. Test with `npx wattpm dev` and `npx wattpm start`
+
+### Entrypoint Pattern (Express Example)
+
+```javascript
+async function create() {
+  const app = express()
+  app.get('/health', (req, res) => res.json({ status: 'ok' }))
+  return app
+}
+module.exports = { create }
 ```
 
 ---

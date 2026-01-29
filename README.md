@@ -120,6 +120,18 @@ Creates a multi-service architecture with:
 - Multiple backend services
 - Inter-service communication via `{service-id}.plt.local`
 
+### Migrate Existing Application
+
+```bash
+/watt migrate
+/watt poc
+```
+
+Guides through migrating an existing Node.js app:
+- Prerequisites checklist
+- Entrypoint modification (`create`/`close` exports)
+- watt.json configuration
+
 ## Supported Frameworks
 
 | Framework | Package | Detection |
