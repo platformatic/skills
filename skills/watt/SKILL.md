@@ -1,14 +1,15 @@
 ---
 name: watt
 description: |
-  Integrate, configure, and deploy Platformatic Watt for Node.js applications.
+  Integrate, configure, and deploy Platformatic Watt for Node.js and PHP applications.
   Use when users ask to:
   - "add watt", "setup watt", "integrate watt", "configure watt"
   - "deploy with watt", "containerize my app", "deploy to kubernetes"
   - "migrate to watt", "port my app to watt"
   - "create watt.json", "configure platformatic"
   - work with Node.js application servers
-  Supports Next.js, Express, Fastify, Koa, Remix, Astro, and NestJS.
+  - run PHP, WordPress, or Laravel in Node.js
+  Supports Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, PHP, WordPress, and Laravel.
 argument-hint: "[init|deploy|status] [framework-hint]"
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit
 ---
@@ -59,6 +60,9 @@ Analyze the project to identify the framework. Use this priority order:
 | `remix.config.js` | Remix | `@platformatic/remix` |
 | `astro.config.mjs`, `astro.config.ts` | Astro | `@platformatic/astro` |
 | `nest-cli.json` | NestJS | `@platformatic/node` |
+| `wp-config.php` | WordPress | `@platformatic/php` |
+| `artisan` + `composer.json` | Laravel | `@platformatic/php` |
+| `composer.json` + `public/index.php` | PHP | `@platformatic/php` |
 
 **Priority 2 - Dependencies (check package.json):**
 | Dependency | Framework | Package |
@@ -79,6 +83,7 @@ If no framework detected, use generic Node.js with `@platformatic/node`.
 - [references/frameworks/remix.md](references/frameworks/remix.md) for Remix
 - [references/frameworks/astro.md](references/frameworks/astro.md) for Astro
 - [references/frameworks/nestjs.md](references/frameworks/nestjs.md) for NestJS
+- [references/frameworks/php.md](references/frameworks/php.md) for PHP, WordPress, and Laravel
 
 ### Step 2: Generate watt.json
 
@@ -87,7 +92,7 @@ Create `watt.json` based on detected framework. Use the schema URL:
 https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json
 ```
 
-Where `{package}` is: `next`, `remix`, `astro`, or `node`.
+Where `{package}` is: `next`, `remix`, `astro`, `node`, or `php`.
 
 ### Step 3: Install Dependencies
 

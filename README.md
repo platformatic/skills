@@ -117,6 +117,9 @@ Generates platform-specific configuration files.
 | Fastify | `@platformatic/node` | `fastify` in dependencies |
 | Koa | `@platformatic/node` | `koa` in dependencies |
 | NestJS | `@platformatic/node` | `nest-cli.json` or `@nestjs/core` |
+| WordPress | `@platformatic/php` | `wp-config.php` |
+| Laravel | `@platformatic/php` | `artisan` + `composer.json` |
+| PHP | `@platformatic/php` | `composer.json` + `public/index.php` |
 
 ## Requirements
 

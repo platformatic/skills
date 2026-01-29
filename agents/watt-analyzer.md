@@ -1,6 +1,6 @@
 ---
 name: watt-analyzer
-description: Analyzes Node.js projects to determine framework type, existing configuration, and Watt integration requirements
+description: Analyzes Node.js and PHP projects to determine framework type, existing configuration, and Watt integration requirements
 allowed-tools: Glob, Grep, Read
 ---
 
@@ -22,6 +22,9 @@ next.config.{js,ts,mjs}     → Next.js
 remix.config.js             → Remix
 astro.config.{mjs,ts}       → Astro
 nest-cli.json               → NestJS
+wp-config.php               → WordPress (use @platformatic/php)
+artisan + composer.json     → Laravel (use @platformatic/php)
+composer.json + public/index.php → PHP (use @platformatic/php)
 ```
 
 **Priority 2 - Dependencies (package.json):**
