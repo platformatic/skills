@@ -225,6 +225,16 @@ Scripts: [Configured/Missing]
 - Always recommend running `wattpm build` before production deployment
 - TypeScript is supported natively via Node.js type stripping (v22.6+)
 
+## Performance Optimization
+
+For production performance tuning, read [references/performance.md](references/performance.md)
+
+Key optimizations:
+- Configure `PLT_NEXT_WORKERS` for multi-threaded SSR
+- Scale CPU limits proportionally (workers × 1000m)
+- Enable distributed caching with Valkey/Redis
+- Use `output: 'standalone'` for Next.js
+
 ## Troubleshooting
 
 For common issues, read [references/troubleshooting.md](references/troubleshooting.md)

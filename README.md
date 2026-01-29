@@ -4,9 +4,10 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 
 ## Features
 
-- **Automatic Framework Detection**: Detects Next.js, Express, Fastify, Koa, Remix, Astro, and NestJS
+- **Automatic Framework Detection**: Detects Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
+- **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
 - **Status Checking**: Verify your Watt setup with a single command
 
 ## Installation

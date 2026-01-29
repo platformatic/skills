@@ -125,3 +125,93 @@ For micro-frontends, configure multiple Next.js apps in a monorepo:
 ## TypeScript
 
 Next.js TypeScript projects work out of the box. No additional configuration needed - Watt uses Node.js native type stripping.
+
+---
+
+## Performance Optimization
+
+### Standalone Output Mode
+
+For production, use standalone output for smaller images:
+
+```javascript
+// next.config.mjs
+export default {
+  output: 'standalone',
+};
+```
+
+### Multithreaded SSR with Workers
+
+Configure workers for parallel SSR processing:
+
+```json
+{
+  "runtime": {
+    "workers": {
+      "static": "{PLT_NEXT_WORKERS}"
+    }
+  }
+}
+```
+
+**CPU Scaling Rule**: Set CPU limit = `PLT_NEXT_WORKERS × 1000m`
+
+Example for 4 workers:
+```bash
+PLT_NEXT_WORKERS=4
+# Requires: cpu limit = 4000m (4 cores)
+```
+
+### Distributed Caching
+
+Share ISR cache across replicas with Valkey/Redis:
+
+```json
+{
+  "cache": {
+    "adapter": "valkey",
+    "url": "{PLT_VALKEY_HOST}"
+  }
+}
+```
+
+### Optimized Production watt.json
+
+```json
+{
+  "$schema": "https://schemas.platformatic.dev/@platformatic/next/3.0.0.json",
+  "application": {
+    "basePath": "/",
+    "commands": {
+      "development": "next dev",
+      "build": "next build",
+      "production": "next start"
+    }
+  },
+  "runtime": {
+    "logger": {
+      "level": "{PLT_SERVER_LOGGER_LEVEL}"
+    },
+    "server": {
+      "hostname": "0.0.0.0",
+      "port": "{PORT}"
+    },
+    "workers": {
+      "static": "{PLT_NEXT_WORKERS}"
+    }
+  },
+  "cache": {
+    "adapter": "valkey",
+    "url": "{PLT_VALKEY_HOST}"
+  }
+}
+```
+
+### Why Watt is Faster
+
+Watt uses **SO_REUSEPORT** (Linux kernel feature) to distribute connections across workers with zero coordination overhead—eliminating the ~30% performance tax from PM2/cluster module IPC-based load balancing.
+
+Benchmarks show **93% latency improvement** vs traditional approaches.
+
+For full details, see [../performance.md](../performance.md)
