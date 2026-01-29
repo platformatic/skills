@@ -82,7 +82,7 @@
 ## Installation
 
 ```bash
-npm install wattpm @platformatic/node
+npm install wattpm
 ```
 
 ## Key Considerations

@@ -99,9 +99,17 @@ Where `{package}` is: `next`, `remix`, `astro`, `node`, or `php`.
 
 ### Step 3: Install Dependencies
 
-Install the appropriate Platformatic package:
+Install wattpm:
 ```bash
-npm install wattpm @platformatic/{package}
+npm install wattpm
+```
+
+For Next.js, Remix, Astro, or PHP, also install the specific stackable:
+```bash
+npm install @platformatic/next    # for Next.js
+npm install @platformatic/remix   # for Remix
+npm install @platformatic/astro   # for Astro
+npm install @platformatic/php     # for PHP/WordPress/Laravel
 ```
 
 ### Step 4: Update package.json Scripts

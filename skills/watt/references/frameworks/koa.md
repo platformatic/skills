@@ -59,12 +59,12 @@
 ## Installation
 
 ```bash
-npm install wattpm @platformatic/node
+npm install wattpm
 ```
 
-For TypeScript:
+For TypeScript, also add:
 ```bash
-npm install wattpm @platformatic/node tsx typescript --save-dev
+npm install tsx typescript --save-dev
 ```
 
 ## Key Considerations

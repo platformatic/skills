@@ -59,7 +59,7 @@
 ## Installation
 
 ```bash
-npm install wattpm @platformatic/node
+npm install wattpm
 ```
 
 For SWC builder:
