@@ -1,0 +1,21 @@
+{
+  "name": "watt",
+  "description": "Platformatic Watt integration for Node.js projects. Provides framework detection, configuration generation, and deployment automation for Next.js, Express, Fastify, Koa, Remix, Astro, and NestJS applications.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Platformatic",
+    "email": "support@platformatic.dev"
+  },
+  "homepage": "https://platformatic.dev/watt",
+  "repository": "https://github.com/platformatic/watt-skill",
+  "license": "Apache-2.0",
+  "keywords": [
+    "platformatic",
+    "watt",
+    "node.js",
+    "application-server",
+    "deployment",
+    "docker",
+    "kubernetes"
+  ]
+}

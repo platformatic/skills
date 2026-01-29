@@ -1,0 +1,225 @@
+---
+name: watt
+description: |
+  Integrate, configure, and deploy Platformatic Watt for Node.js applications.
+  Use when users ask to:
+  - "add watt", "setup watt", "integrate watt", "configure watt"
+  - "deploy with watt", "containerize my app", "deploy to kubernetes"
+  - "migrate to watt", "port my app to watt"
+  - "create watt.json", "configure platformatic"
+  - work with Node.js application servers
+  Supports Next.js, Express, Fastify, Koa, Remix, Astro, and NestJS.
+argument-hint: "[init|deploy|status] [framework-hint]"
+allowed-tools: Read, Glob, Grep, Bash, Write, Edit
+---
+
+# Platformatic Watt Integration Skill
+
+You are an expert in Platformatic Watt, the Node.js Application Server. Help users integrate, configure, and deploy Watt in their projects.
+
+## Prerequisites Check
+
+Before any Watt operation, verify:
+
+1. **Node.js Version**: Watt requires Node.js v22.19.0+
+   ```bash
+   node --version
+   ```
+   If below v22.19.0, inform user they must upgrade Node.js first.
+
+2. **Existing Watt Config**: Check if `watt.json` already exists
+   ```bash
+   ls watt.json 2>/dev/null
+   ```
+
+## Command Router
+
+Based on user input ($ARGUMENTS), route to the appropriate workflow:
+
+| Input Pattern | Action |
+|--------------|--------|
+| `init`, `setup`, `integrate`, (empty) | Run **Integration Workflow** |
+| `deploy docker` | Run **Docker Deployment** |
+| `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
+| `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
+| `status`, `check` | Run **Status Check** |
+
+---
+
+## Integration Workflow
+
+### Step 1: Framework Detection
+
+Analyze the project to identify the framework. Use this priority order:
+
+**Priority 1 - Config Files:**
+| File | Framework | Package |
+|------|-----------|---------|
+| `next.config.js`, `next.config.ts`, `next.config.mjs` | Next.js | `@platformatic/next` |
+| `remix.config.js` | Remix | `@platformatic/remix` |
+| `astro.config.mjs`, `astro.config.ts` | Astro | `@platformatic/astro` |
+| `nest-cli.json` | NestJS | `@platformatic/node` |
+
+**Priority 2 - Dependencies (check package.json):**
+| Dependency | Framework | Package |
+|------------|-----------|---------|
+| `@nestjs/core` | NestJS | `@platformatic/node` |
+| `fastify` | Fastify | `@platformatic/node` |
+| `express` | Express | `@platformatic/node` |
+| `koa` | Koa | `@platformatic/node` |
+
+**Priority 3 - Fallback:**
+If no framework detected, use generic Node.js with `@platformatic/node`.
+
+**For framework-specific configuration, read the appropriate reference file:**
+- [references/frameworks/nextjs.md](references/frameworks/nextjs.md) for Next.js
+- [references/frameworks/express.md](references/frameworks/express.md) for Express
+- [references/frameworks/fastify.md](references/frameworks/fastify.md) for Fastify
+- [references/frameworks/koa.md](references/frameworks/koa.md) for Koa
+- [references/frameworks/remix.md](references/frameworks/remix.md) for Remix
+- [references/frameworks/astro.md](references/frameworks/astro.md) for Astro
+- [references/frameworks/nestjs.md](references/frameworks/nestjs.md) for NestJS
+
+### Step 2: Generate watt.json
+
+Create `watt.json` based on detected framework. Use the schema URL:
+```
+https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json
+```
+
+Where `{package}` is: `next`, `remix`, `astro`, or `node`.
+
+### Step 3: Install Dependencies
+
+Install the appropriate Platformatic package:
+```bash
+npm install wattpm @platformatic/{package}
+```
+
+### Step 4: Update package.json Scripts
+
+Add or update these scripts in package.json:
+```json
+{
+  "scripts": {
+    "dev": "wattpm dev",
+    "build": "wattpm build",
+    "start": "wattpm start"
+  }
+}
+```
+
+### Step 5: Create Environment File
+
+Create `.env` if it doesn't exist:
+```
+PLT_SERVER_HOSTNAME=0.0.0.0
+PLT_SERVER_LOGGER_LEVEL=info
+PORT=3000
+```
+
+### Step 6: Verify Setup
+
+Run a quick verification:
+```bash
+wattpm --version
+```
+
+Inform the user they can now run:
+- `npm run dev` for development
+- `npm run build && npm run start` for production
+
+---
+
+## Deployment Workflows
+
+### Docker Deployment
+
+When user requests Docker deployment:
+
+1. Read [references/deployment/docker.md](references/deployment/docker.md)
+2. Generate:
+   - Multi-stage `Dockerfile` optimized for Watt
+   - `.dockerignore` file
+   - Optional `docker-compose.yml` for development
+3. Provide build and run commands
+
+### Kubernetes Deployment
+
+When user requests Kubernetes deployment:
+
+1. Read [references/deployment/kubernetes.md](references/deployment/kubernetes.md)
+2. Generate:
+   - `deployment.yaml` with health checks
+   - `service.yaml`
+   - `configmap.yaml` for environment variables
+   - Optional `hpa.yaml` for autoscaling
+3. Provide kubectl apply commands
+
+### Cloud Deployment
+
+When user requests cloud deployment:
+
+1. Read [references/deployment/cloud.md](references/deployment/cloud.md)
+2. Based on target platform, generate appropriate config:
+   - Fly.io: `fly.toml`
+   - Railway: `railway.json`
+   - Render: `render.yaml`
+3. Provide deployment commands
+
+---
+
+## Status Check
+
+When user runs `/watt status`:
+
+1. **Node.js Version**
+   ```bash
+   node --version
+   ```
+   Check if >= v22.19.0
+
+2. **watt.json Exists**
+   ```bash
+   ls watt.json
+   ```
+
+3. **watt.json Valid**
+   ```bash
+   node -e "JSON.parse(require('fs').readFileSync('watt.json'))"
+   ```
+
+4. **wattpm Installed**
+   ```bash
+   npx wattpm --version
+   ```
+
+5. **package.json Scripts**
+   Check for dev, build, start scripts
+
+Report findings in a clear format:
+```
+Watt Configuration Status
+========================
+Node.js Version: vX.X.X [OK/UPGRADE NEEDED]
+watt.json: [Found/Missing]
+Configuration: [Valid/Invalid]
+wattpm: [Installed vX.X.X/Not installed]
+Scripts: [Configured/Missing]
+
+[Next steps if any issues found]
+```
+
+---
+
+## Important Notes
+
+- Watt 3.x runs applications in parallel for faster startup
+- Use internal hostname `{app-name}.plt.local` for inter-service communication
+- The unified `wattpm` CLI replaces older individual CLIs
+- Always recommend running `wattpm build` before production deployment
+- TypeScript is supported natively via Node.js type stripping (v22.6+)
+
+## Troubleshooting
+
+For common issues, read [references/troubleshooting.md](references/troubleshooting.md)
