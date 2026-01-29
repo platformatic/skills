@@ -32,7 +32,13 @@ Technical requirements and steps for integrating an existing Node.js application
 ### Step 1: Install Dependencies
 
 ```bash
-npm install wattpm @platformatic/node
+npm install wattpm
+```
+
+Or use directly via npx without installing:
+```bash
+npx wattpm dev
+npx wattpm start
 ```
 
 ### Step 2: Create watt.json
@@ -304,7 +310,7 @@ For TypeScript, either:
 Before the POC session, verify:
 
 - [ ] `npm install` completes without errors
-- [ ] `npm install wattpm @platformatic/node` succeeds
+- [ ] `npm install wattpm` succeeds (or use `npx wattpm`)
 - [ ] `watt.json` created with correct entrypoint
 - [ ] Entrypoint exports `create` or `close` function
 - [ ] `npx wattpm start` launches the application

@@ -172,7 +172,7 @@ When user wants to migrate an existing app or prepare for a POC:
    - Node.js 22.19.0+
    - Application runs locally
    - Database/API access available
-3. Install: `npm install wattpm @platformatic/node`
+3. Install: `npm install wattpm` (or use `npx wattpm`)
 4. Create `watt.json` with application entrypoint
 5. Modify entrypoint to export `create` function (returns server) or `close` function
 6. Test with `npx wattpm dev` and `npx wattpm start`
