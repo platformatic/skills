@@ -43,6 +43,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
 | `kafka`, `event-driven`, `messaging` | Run **Kafka Integration Setup** |
 | `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
+| `observability`, `logging`, `tracing`, `metrics` | Run **Observability Setup** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -194,6 +195,42 @@ async function create() {
   return app
 }
 module.exports = { create }
+```
+
+---
+
+## Observability Setup
+
+When user requests logging, tracing, or metrics setup:
+
+1. Read [references/observability.md](references/observability.md)
+2. Determine observability needs:
+   - **Logging**: Pino configuration, file transport, redaction
+   - **Tracing**: OpenTelemetry with OTLP exporter
+   - **Metrics**: Prometheus endpoint on port 9090
+3. Configure based on backend:
+   - Jaeger, Datadog, New Relic, Grafana Stack, AWS, GCP, Azure
+4. Set up log-trace correlation for debugging
+
+### Quick Setup
+
+**Logging + Tracing + Metrics:**
+```json
+{
+  "logger": {
+    "level": "{PLT_SERVER_LOGGER_LEVEL}"
+  },
+  "telemetry": {
+    "serviceName": "my-service",
+    "exporter": {
+      "type": "otlp",
+      "options": { "url": "{OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces" }
+    }
+  },
+  "metrics": {
+    "port": 9090
+  }
+}
 ```
 
 ---
