@@ -9,6 +9,7 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
 - **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks
+- **Scheduled Jobs**: Cron-based task scheduling with retry support
 - **Observability**: Logging (Pino), tracing (OpenTelemetry), metrics (Prometheus)
 - **Status Checking**: Verify your Watt setup with a single command
 

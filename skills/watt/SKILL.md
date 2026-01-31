@@ -44,6 +44,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `kafka`, `event-driven`, `messaging` | Run **Kafka Integration Setup** |
 | `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
 | `observability`, `logging`, `tracing`, `metrics` | Run **Observability Setup** |
+| `scheduler`, `cron`, `jobs` | Run **Scheduler Setup** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -251,6 +252,40 @@ When user requests Kafka/event-driven setup:
 - **Webhook**: Kafka messages → HTTP endpoints (with DLQ)
 - **Request/Response**: HTTP → Kafka → HTTP (correlation IDs)
 - **HTTP Publishing**: POST to `/topics/{topicName}`
+
+---
+
+## Scheduler Setup
+
+When user requests cron/scheduled jobs setup:
+
+1. Read [references/scheduler.md](references/scheduler.md)
+2. Add `scheduler` array to `watt.json`
+3. Configure jobs with cron expressions, callback URLs, and retry settings
+4. Create endpoint handlers in target services
+
+### Quick Setup
+
+```json
+{
+  "scheduler": [
+    {
+      "name": "daily-cleanup",
+      "cron": "0 0 3 * * *",
+      "callbackUrl": "http://api.plt.local/cron/cleanup",
+      "method": "POST",
+      "maxRetries": 3
+    }
+  ]
+}
+```
+
+### Key Points
+
+- Uses standard cron format with optional seconds field
+- Internal URLs: `http://{service-id}.plt.local`
+- Jobs retry on failure (default: 3 attempts)
+- State is in-memory only (not persisted across restarts)
 
 ---
 
