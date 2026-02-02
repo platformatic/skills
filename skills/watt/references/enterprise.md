@@ -54,32 +54,40 @@ my-enterprise-app/
 
 ### Root watt.json Configuration
 
+**Using autoload (recommended):**
+```json
+{
+  "$schema": "https://schemas.platformatic.dev/watt/2.0.0.json",
+  "server": {
+    "hostname": "0.0.0.0",
+    "port": "{PORT}"
+  },
+  "autoload": {
+    "path": "web"
+  },
+  "entrypoint": "composer",
+  "workers": {
+    "frontend": "{PLT_FRONTEND_WORKERS}"
+  }
+}
+```
+
+**Using explicit service list:**
 ```json
 {
   "$schema": "https://schemas.platformatic.dev/@platformatic/runtime/3.0.0.json",
   "entrypoint": "composer",
   "web": [
-    {
-      "id": "composer",
-      "path": "web/composer"
-    },
-    {
-      "id": "frontend",
-      "path": "web/frontend"
-    },
-    {
-      "id": "api",
-      "path": "web/api"
-    },
-    {
-      "id": "db",
-      "path": "web/db"
-    }
+    { "id": "composer", "path": "web/composer" },
+    { "id": "frontend", "path": "web/frontend" },
+    { "id": "api", "path": "web/api" },
+    { "id": "db", "path": "web/db" }
   ],
+  "workers": {
+    "frontend": "{PLT_FRONTEND_WORKERS}"
+  },
   "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
+    "logger": { "level": "{PLT_SERVER_LOGGER_LEVEL}" },
     "server": {
       "hostname": "{PLT_SERVER_HOSTNAME}",
       "port": "{PORT}"
@@ -87,6 +95,40 @@ my-enterprise-app/
   }
 }
 ```
+
+### Worker Configuration
+
+Configure multiple workers per service for SSR-heavy workloads:
+
+```json
+{
+  "workers": {
+    "frontend": "{PLT_FRONTEND_WORKERS}",
+    "api": 2
+  }
+}
+```
+
+**Key points:**
+- Use the **service directory name** as the key (e.g., `"frontend"`, not `"web/frontend"`)
+- Worker count can be a number or environment variable
+- Each worker handles requests independently
+- Recommended: `PLT_FRONTEND_WORKERS=4` for production
+
+### Environment Variable Injection
+
+Use `{VAR_NAME}` syntax to inject environment variables in config files:
+
+```json
+{
+  "port": "{PORT}",
+  "workers": {
+    "frontend": "{PLT_FRONTEND_WORKERS}"
+  }
+}
+```
+
+This works in any Watt/Platformatic JSON config file.
 
 ---
 
@@ -99,36 +141,45 @@ Composer acts as the central orchestration service, routing requests to appropri
 `web/composer/platformatic.json`:
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/composer/3.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/composer/2.0.0.json",
   "composer": {
     "services": [
       {
         "id": "frontend",
-        "proxy": {
-          "prefix": "/"
-        }
+        "origin": "internal://frontend",
+        "proxy": { "prefix": "/" }
       },
       {
         "id": "api",
-        "proxy": {
-          "prefix": "/api"
-        }
+        "origin": "internal://api",
+        "proxy": { "prefix": "/api" }
+      },
+      {
+        "id": "content-worker",
+        "origin": "internal://content-worker",
+        "proxy": { "prefix": "/content" }
       },
       {
         "id": "db",
-        "proxy": {
-          "prefix": "/db"
-        }
+        "origin": "internal://db",
+        "proxy": { "prefix": "/db" }
       }
     ],
     "refreshTimeout": 5000
-  },
-  "server": {
-    "hostname": "{PLT_SERVER_HOSTNAME}",
-    "port": "{PORT}"
   }
 }
 ```
+
+### Service Origins
+
+Use `internal://` for in-memory service mesh communication:
+
+| Origin Type | Example | Use Case |
+|-------------|---------|----------|
+| `internal://service-id` | `internal://api` | Services within same Watt runtime |
+| `http://host:port` | `http://external:3000` | External services |
+
+**Key point:** `internal://` enables zero-network-overhead communication between services.
 
 ### Path-Based Routing
 
@@ -136,9 +187,26 @@ Composer acts as the central orchestration service, routing requests to appropri
 |------|---------|-------------|
 | `/` | frontend | Next.js/Remix UI |
 | `/api/*` | api | Fastify REST API |
+| `/content/*` | content-worker | CMS webhooks, background tasks |
 | `/db/*` | db | Platformatic DB auto-generated API |
 | `/graphql` | db | GraphQL endpoint |
 | `/documentation` | composer | Aggregated OpenAPI docs |
+
+### Route Priority
+
+**Important:** Routes are matched in order. Place more specific prefixes **after** less specific ones:
+
+```json
+{
+  "services": [
+    { "id": "frontend", "proxy": { "prefix": "/" } },
+    { "id": "api", "proxy": { "prefix": "/api/v1" } },
+    { "id": "content", "proxy": { "prefix": "/content" } }
+  ]
+}
+```
+
+The catch-all `/` route should typically be listed first for the frontend.
 
 ---
 
@@ -148,13 +216,36 @@ Services communicate using internal hostnames without network overhead.
 
 ### Internal Service URLs
 
+**From application code (fetch):**
 ```javascript
 // From api service, call db service
 const response = await fetch('http://db.plt.local/users');
 
 // From frontend, call api service (server-side)
 const data = await fetch('http://api.plt.local/products');
+
+// Call content-worker to trigger cache invalidation
+await fetch('http://content-worker.plt.local/revalidate', {
+  method: 'POST',
+  body: JSON.stringify({ tags: ['products'] })
+});
 ```
+
+**From Composer config (internal://):**
+```json
+{
+  "origin": "internal://api"
+}
+```
+
+### Two Communication Patterns
+
+| Context | Pattern | Example |
+|---------|---------|---------|
+| Application code (fetch) | `http://{service-id}.plt.local` | `http://api.plt.local/users` |
+| Composer config | `internal://{service-id}` | `internal://api` |
+
+Both enable zero-network-overhead in-memory communication.
 
 ### Hostname Pattern
 
@@ -166,6 +257,7 @@ Examples:
 - `http://frontend.plt.local`
 - `http://api.plt.local`
 - `http://db.plt.local`
+- `http://content-worker.plt.local`
 
 ---
 

@@ -45,6 +45,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
 | `observability`, `logging`, `tracing`, `metrics` | Run **Observability Setup** |
 | `scheduler`, `cron`, `jobs` | Run **Scheduler Setup** |
+| `cms`, `contentful`, `sanity`, `headless` | Run **CMS Integration Setup** |
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
@@ -286,6 +287,24 @@ When user requests cron/scheduled jobs setup:
 - Internal URLs: `http://{service-id}.plt.local`
 - Jobs retry on failure (default: 3 attempts)
 - State is in-memory only (not persisted across restarts)
+
+---
+
+## CMS Integration Setup
+
+When user requests headless CMS integration (Contentful, Sanity, Strapi, etc.):
+
+1. Read [references/cms-integration.md](references/cms-integration.md)
+2. Recommend architecture with separate content-worker service
+3. Set up webhook endpoint for CMS callbacks
+4. Configure cache invalidation with Next.js `revalidateTag()`
+5. Create mock data pattern for development
+
+### Key Components
+
+- **Content Worker**: Fastify service handling webhooks
+- **Cache Tags**: Map CMS content types to Next.js cache tags
+- **Revalidation API**: Next.js endpoint called by content-worker
 
 ---
 

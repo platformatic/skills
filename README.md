@@ -10,6 +10,7 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
 - **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks
 - **Scheduled Jobs**: Cron-based task scheduling with retry support
+- **CMS Integration**: Headless CMS webhooks and cache invalidation (Contentful, Sanity, Strapi)
 - **Observability**: Logging (Pino), tracing (OpenTelemetry), metrics (Prometheus)
 - **Status Checking**: Verify your Watt setup with a single command
 

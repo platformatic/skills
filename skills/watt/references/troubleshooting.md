@@ -402,6 +402,163 @@ kubectl logs <pod-name> --previous
 
 ---
 
+### Composer Service Discovery Issues
+
+**Error**: Service not found or routing not working
+
+**Solutions**:
+
+1. **Use `internal://` origin for in-memory communication**:
+```json
+{
+  "composer": {
+    "services": [
+      {
+        "id": "api",
+        "origin": "internal://api",
+        "proxy": { "prefix": "/api" }
+      }
+    ]
+  }
+}
+```
+
+2. **Check service ID matches directory name**:
+The service `id` must match the directory name under `web/`.
+
+3. **Verify route priority**:
+More specific prefixes should come after less specific ones:
+```json
+{
+  "services": [
+    { "id": "frontend", "proxy": { "prefix": "/" } },
+    { "id": "api", "proxy": { "prefix": "/api/v1" } }
+  ]
+}
+```
+
+---
+
+### Worker Configuration Issues
+
+**Error**: Workers not starting or wrong service scaled
+
+**Solutions**:
+
+1. **Use service directory name as key**:
+```json
+{
+  "workers": {
+    "storefront": 4,
+    "api": 2
+  }
+}
+```
+Use `"storefront"`, not `"web/storefront"` or the full path.
+
+2. **Environment variable for dynamic config**:
+```json
+{
+  "workers": {
+    "storefront": "{PLT_STOREFRONT_WORKERS}"
+  }
+}
+```
+
+---
+
+### Environment Variable Injection Issues
+
+**Error**: `{VAR_NAME}` appearing literally instead of value
+
+**Solutions**:
+
+1. **Use correct syntax**:
+```json
+{
+  "port": "{PORT}",
+  "workers": "{PLT_WORKERS}"
+}
+```
+Note: Use `{VAR_NAME}`, not `${VAR_NAME}` or `$VAR_NAME`.
+
+2. **Ensure variable is set**:
+```bash
+export PORT=3000
+# or
+PORT=3000 npm run dev
+```
+
+3. **Check .env file is loaded**:
+The `.env` file must be in the project root.
+
+---
+
+### Next.js ISR Cache Issues in Multi-Worker Setup
+
+**Error**: Cache invalidation not propagating to all workers
+
+**Solutions**:
+
+1. **Use `revalidateTag()` for cache invalidation**:
+```typescript
+import { revalidateTag } from 'next/cache';
+revalidateTag('products');
+```
+This works across all Watt workers.
+
+2. **For distributed deployments, use Valkey/Redis**:
+```json
+{
+  "cache": {
+    "adapter": "valkey",
+    "url": "{PLT_VALKEY_HOST}"
+  }
+}
+```
+
+3. **Create a revalidation API endpoint**:
+```typescript
+// app/api/revalidate/route.ts
+export async function POST(request) {
+  const { tags } = await request.json();
+  for (const tag of tags) {
+    revalidateTag(tag);
+  }
+  return Response.json({ revalidated: true });
+}
+```
+
+---
+
+### Inter-Service Communication Not Working
+
+**Error**: `fetch('http://service.plt.local/...')` failing
+
+**Solutions**:
+
+1. **Use correct hostname pattern**:
+```javascript
+// Correct
+fetch('http://api.plt.local/users')
+
+// Incorrect
+fetch('http://api/users')
+fetch('http://localhost:3001/users')
+```
+
+2. **Ensure service is running**:
+```bash
+wattpm info  # List running services
+```
+
+3. **Check service health**:
+```bash
+curl http://localhost:3042/api/health
+```
+
+---
+
 ## Debugging Tips
 
 ### Enable Debug Logging

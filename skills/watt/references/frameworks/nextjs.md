@@ -38,7 +38,8 @@
 ## Installation
 
 ```bash
-npm install wattpm @platformatic/next
+npm install wattpm
+npm install @platformatic/next
 ```
 
 ## Key Considerations
@@ -62,15 +63,36 @@ For production, configure workers via environment variable:
 PLT_NEXT_WORKERS=4
 ```
 
-Add to watt.json:
+**Standalone Next.js app** - add to watt.json:
 ```json
 {
   "workers": "{PLT_NEXT_WORKERS}"
 }
 ```
 
-### Static Export
-Static export (`output: 'export'`) is NOT supported. Watt requires server-side rendering.
+**Multi-service setup** - use the service directory name as key in root watt.json:
+```json
+{
+  "workers": {
+    "storefront": "{PLT_STOREFRONT_WORKERS}",
+    "admin": "{PLT_ADMIN_WORKERS}"
+  }
+}
+```
+
+**Key point:** Use the service directory name (e.g., `"storefront"`), not the full path.
+
+### Output Mode (Important)
+
+**Recommended:** Use `output: 'standalone'` for optimal Watt deployment:
+```javascript
+// next.config.mjs
+export default {
+  output: 'standalone',
+};
+```
+
+**Not supported:** `output: 'export'` (static export) - Watt requires server-side rendering.
 
 ### Turbopack
 Currently, disable Turbopack and use standard webpack build for compatibility.
@@ -110,6 +132,25 @@ Next.js middleware is fully supported.
 ### Image Optimization
 The built-in Next.js image optimizer works with Watt.
 
+For external image sources (CDN, CMS like Contentful):
+```javascript
+// next.config.mjs
+export default {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.ctfassets.net',  // Contentful
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.example.com',
+      },
+    ],
+  },
+};
+```
+
 ## Multi-Zone Setup
 
 For micro-frontends, configure multiple Next.js apps in a monorepo:
@@ -125,6 +166,79 @@ For micro-frontends, configure multiple Next.js apps in a monorepo:
 ## TypeScript
 
 Next.js TypeScript projects work out of the box. No additional configuration needed - Watt uses Node.js native type stripping.
+
+---
+
+## ISR and Cache Invalidation
+
+### Cache Tags with `unstable_cache`
+
+Use Next.js 14+ `unstable_cache` with tags for fine-grained cache invalidation:
+
+```typescript
+import { unstable_cache } from 'next/cache';
+
+const getProducts = unstable_cache(
+  async () => {
+    const res = await fetch('http://api.plt.local/products');
+    return res.json();
+  },
+  ['products'],  // cache key
+  { tags: ['products'], revalidate: 3600 }
+);
+```
+
+### On-Demand Revalidation API
+
+Create a revalidation endpoint for webhooks:
+
+```typescript
+// app/api/revalidate/route.ts
+import { revalidateTag } from 'next/cache';
+import { NextRequest } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  const { tags } = await request.json();
+
+  for (const tag of tags) {
+    revalidateTag(tag);
+  }
+
+  return Response.json({ revalidated: true, tags });
+}
+```
+
+### Multi-Worker Cache Behavior
+
+**Important:** Cache tags work across Watt workers. When you call `revalidateTag()`, it invalidates the cache in all worker instances.
+
+### CMS Webhook Pattern
+
+For headless CMS integration (Contentful, Sanity, etc.):
+
+1. CMS webhook triggers your content-worker service
+2. Content-worker parses the content type
+3. Content-worker calls Next.js revalidate API
+
+```javascript
+// In content-worker service
+app.post('/webhook/cms', async (req) => {
+  const contentType = req.body.sys.contentType.sys.id;
+  const tagMap = {
+    'product': 'products',
+    'article': 'articles',
+    'page': 'pages'
+  };
+
+  const tag = tagMap[contentType];
+  if (tag) {
+    await fetch('http://frontend.plt.local/api/revalidate', {
+      method: 'POST',
+      body: JSON.stringify({ tags: [tag] })
+    });
+  }
+});
+```
 
 ---
 

@@ -85,6 +85,61 @@
 npm install wattpm
 ```
 
+---
+
+## Platformatic Service (Recommended for Multi-Service)
+
+When running Fastify as a service within Watt's multi-service architecture, use Platformatic Service configuration:
+
+### platformatic.json (in service directory)
+
+```json
+{
+  "$schema": "https://schemas.platformatic.dev/service/2.0.0.json",
+  "service": {
+    "openapi": true
+  },
+  "plugins": {
+    "paths": ["./src/app.ts"],
+    "typescript": true
+  }
+}
+```
+
+### Plugin Registration Pattern
+
+Export a default async function that receives the Fastify instance:
+
+```typescript
+// src/app.ts
+import { FastifyInstance } from 'fastify';
+
+export default async function (fastify: FastifyInstance) {
+  // Register routes directly
+  fastify.get('/health', async () => ({ status: 'ok' }));
+
+  // Or register route plugins with prefix
+  fastify.register(import('./routes/users.js'), { prefix: '/users' });
+  fastify.register(import('./routes/products.js'), { prefix: '/products' });
+}
+```
+
+### Features
+
+| Option | Description |
+|--------|-------------|
+| `service.openapi: true` | Auto-generate OpenAPI/Swagger documentation |
+| `plugins.typescript: true` | Enable TypeScript compilation |
+| `plugins.paths` | Array of plugin files to load |
+
+### OpenAPI Documentation
+
+With `openapi: true`, access documentation at:
+- `/documentation` - Swagger UI
+- `/documentation/json` - OpenAPI spec
+
+---
+
 ## Key Considerations
 
 ### Host Binding
