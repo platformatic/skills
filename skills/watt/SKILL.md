@@ -41,7 +41,6 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 |--------------|--------|
 | `init`, `setup`, `integrate`, (empty) | Run **Integration Workflow** |
 | `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
-| `kafka`, `event-driven`, `messaging` | Run **Kafka Integration Setup** |
 | `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
 | `observability`, `logging`, `tracing`, `metrics` | Run **Observability Setup** |
 | `scheduler`, `cron`, `jobs` | Run **Scheduler Setup** |
@@ -234,25 +233,6 @@ When user requests logging, tracing, or metrics setup:
   }
 }
 ```
-
----
-
-## Kafka Integration
-
-When user requests Kafka/event-driven setup:
-
-1. Read [references/kafka.md](references/kafka.md)
-2. Choose integration approach:
-   - **@platformatic/kafka**: Direct producer/consumer in your services
-   - **@platformatic/kafka-hooks**: Kafka-to-HTTP webhooks (recommended for Watt)
-3. Create kafka-hooks service with `npx wattpm@latest create`
-4. Configure topics, webhooks, and request/response patterns
-
-### Kafka-Hooks Patterns
-
-- **Webhook**: Kafka messages → HTTP endpoints (with DLQ)
-- **Request/Response**: HTTP → Kafka → HTTP (correlation IDs)
-- **HTTP Publishing**: POST to `/topics/{topicName}`
 
 ---
 

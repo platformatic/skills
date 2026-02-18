@@ -8,7 +8,7 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
-- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks
+- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks (separate `/kafka` skill)
 - **Scheduled Jobs**: Cron-based task scheduling with retry support
 - **CMS Integration**: Headless CMS webhooks and cache invalidation (Contentful, Sanity, Strapi)
 - **Observability**: Logging (Pino), tracing (OpenTelemetry), metrics (Prometheus)
@@ -111,6 +111,21 @@ Generates:
 
 Generates platform-specific configuration files.
 
+### Kafka Integration
+
+```bash
+/kafka
+/kafka hooks
+/kafka producer
+/kafka consumer
+/kafka monitoring
+```
+
+Sets up event-driven microservices with:
+- @platformatic/kafka-hooks (webhooks, request/response, HTTP publishing)
+- @platformatic/kafka (direct producer/consumer)
+- Consumer lag monitoring and OpenTelemetry tracing
+
 ### Multi-Service Enterprise Setup
 
 ```bash
@@ -196,12 +211,16 @@ watt-skill/
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest
 ├── skills/
-│   └── watt/
-│       ├── SKILL.md             # Main skill
+│   ├── watt/
+│   │   ├── SKILL.md             # Main skill
+│   │   └── references/
+│   │       ├── frameworks/      # Framework-specific configs
+│   │       ├── deployment/      # Deployment guides
+│   │       └── troubleshooting.md
+│   └── kafka/
+│       ├── SKILL.md             # Kafka integration skill
 │       └── references/
-│           ├── frameworks/      # Framework-specific configs
-│           ├── deployment/      # Deployment guides
-│           └── troubleshooting.md
+│           └── kafka.md         # Kafka reference docs
 ├── agents/
 │   └── watt-analyzer.md         # Project analysis agent
 ├── commands/
