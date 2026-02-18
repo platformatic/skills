@@ -7,6 +7,8 @@ description: |
   - "deploy with watt", "containerize my app", "deploy to kubernetes"
   - "migrate to watt", "port my app to watt"
   - "create watt.json", "configure platformatic"
+  - "wattpm", "wattpm create", "wattpm inject", "wattpm logs"
+  - use wattpm CLI commands, manage running applications
   - work with Node.js application servers
   - run PHP, WordPress, or Laravel in Node.js
   Supports Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, PHP, WordPress, and Laravel.
@@ -48,6 +50,13 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `deploy docker` | Run **Docker Deployment** |
 | `deploy k8s`, `deploy kubernetes` | Run **Kubernetes Deployment** |
 | `deploy cloud`, `deploy fly`, `deploy railway` | Run **Cloud Deployment** |
+| `cli`, `wattpm`, `commands` | Run **wattpm CLI Workflow** |
+| `create`, `scaffold` | Run **wattpm CLI Workflow** (create) |
+| `inject`, `test endpoint` | Run **wattpm CLI Workflow** (inject) |
+| `logs` | Run **wattpm CLI Workflow** (logs) |
+| `ps`, `applications`, `services` | Run **wattpm CLI Workflow** (ps) |
+| `admin`, `dashboard` | Run **wattpm CLI Workflow** (admin) |
+| `resolve`, `import` | Run **wattpm CLI Workflow** (resolve/import) |
 | `status`, `check` | Run **Status Check** |
 
 ---
@@ -365,6 +374,53 @@ wattpm: [Installed vX.X.X/Not installed]
 Scripts: [Configured/Missing]
 
 [Next steps if any issues found]
+```
+
+---
+
+## wattpm CLI Workflow
+
+When users ask about wattpm commands, CLI usage, or managing running applications:
+
+1. Read [references/wattpm-cli.md](references/wattpm-cli.md)
+2. Based on the user's request, provide the relevant command with flags and examples
+3. For general CLI questions, give an overview of available commands
+
+### Common Scenarios
+
+**Scaffolding a new project:**
+```bash
+wattpm create
+wattpm create --module @platformatic/next
+```
+
+**Testing endpoints on a running app:**
+```bash
+wattpm inject --path /health
+wattpm inject my-app api-service --method POST --path /users \
+  --header "Content-Type: application/json" \
+  --data '{"name": "Alice"}'
+```
+
+**Monitoring a running app:**
+```bash
+wattpm ps                        # list running instances
+wattpm logs my-app               # stream all logs
+wattpm logs my-app api-service   # stream logs from a sub-application
+wattpm env my-app --table        # view environment variables
+wattpm config my-app             # view configuration
+```
+
+**Working with external applications:**
+```bash
+wattpm import . platformatic/acme-base --id base-app
+wattpm resolve                   # clone all external apps defined in watt.json
+```
+
+**Administration:**
+```bash
+wattpm admin                     # launch Watt admin UI
+wattpm patch-config . patches/production.js  # apply config patches
 ```
 
 ---
