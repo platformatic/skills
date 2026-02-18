@@ -8,6 +8,7 @@ description: |
   - "kafka producer", "kafka consumer"
   - "dead letter queue", "DLQ"
   - "request response pattern" with Kafka
+  - "migrate from kafkajs", "kafkajs migration", "replace kafkajs"
   Covers @platformatic/kafka, @platformatic/kafka-hooks, consumer lag monitoring,
   and OpenTelemetry instrumentation.
 argument-hint: "[hooks|producer|consumer|monitoring]"
@@ -44,6 +45,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `producer`, `consumer`, `client` | Run **Kafka Client Setup** |
 | `monitoring`, `lag`, `health` | Run **Consumer Lag Monitoring Setup** |
 | `tracing`, `opentelemetry`, `otel` | Run **Kafka Tracing Setup** |
+| `migrate`, `kafkajs`, `migration` | Run **KafkaJS Migration Workflow** |
 
 ---
 
@@ -104,6 +106,33 @@ When user requests OpenTelemetry tracing for Kafka:
    npm install @platformatic/kafka-opentelemetry
    ```
 3. Enable instrumentation in the service
+
+---
+
+## KafkaJS Migration Workflow
+
+When user wants to migrate from KafkaJS to @platformatic/kafka:
+
+1. Read [references/migration.md](references/migration.md)
+2. Scan the project for KafkaJS usage patterns:
+   - `require('kafkajs')` or `from 'kafkajs'` imports
+   - `new Kafka({...})` factory instantiation
+   - `.producer()`, `.consumer()`, `.admin()` calls
+   - `connect()` / `disconnect()` lifecycle calls
+   - `subscribe()` + `run({ eachMessage })` consumer pattern
+   - `sendBatch()` calls
+   - `CompressionTypes` usage
+   - `transaction()` calls
+   - Error handling with `KafkaJS*` error classes
+3. Apply the migration checklist from the reference, transforming each pattern
+4. Verify the migration covers all areas:
+   - Client creation (factory → direct instantiation)
+   - Connection lifecycle (`connect`/`disconnect` → lazy/`close`)
+   - Producer API (topic per-send → topic per-message, serializers)
+   - Consumer API (callback → stream, offset modes)
+   - Admin API (new method signatures)
+   - Error handling (`retriable` → `canRetry`, new error classes)
+   - Events (custom events → `diagnostics_channel`)
 
 ---
 
