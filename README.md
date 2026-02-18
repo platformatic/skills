@@ -121,10 +121,35 @@ Generates platform-specific configuration files.
 /kafka monitoring
 ```
 
+### Migrate from KafkaJS
+
+```bash
+/kafka migrate
+/kafka kafkajs
+```
+
+Guides through migrating from KafkaJS to @platformatic/kafka:
+- API mapping (factory pattern → direct instantiation)
+- Producer changes (topic per-message, built-in serializers)
+- Consumer changes (callback → stream-based)
+- Admin, transactions, error handling, and diagnostics
+
 Sets up event-driven microservices with:
 - @platformatic/kafka-hooks (webhooks, request/response, HTTP publishing)
 - @platformatic/kafka (direct producer/consumer)
 - Consumer lag monitoring and OpenTelemetry tracing
+
+### wattpm CLI Commands
+
+```bash
+/watt cli                   # overview of all wattpm commands
+/watt create                # scaffold a new project
+/watt inject                # test endpoints on a running app
+/watt logs                  # stream application logs
+/watt ps                    # list running instances
+/watt admin                 # launch Watt admin UI
+/watt resolve               # clone external applications
+```
 
 ### Multi-Service Enterprise Setup
 
