@@ -27,11 +27,16 @@ claude --plugin-dir /path/to/watt-skill
 The plugin exposes three component types, each a Markdown file with YAML frontmatter:
 
 ### Skills (`skills/watt/`)
-- **`SKILL.md`** — Main entrypoint. Contains a command router that maps user input (e.g. `init`, `deploy docker`, `kafka`) to inline workflows. Workflows read reference files on demand — they never bulk-load all references.
+- **`SKILL.md`** — Main entrypoint. Contains a command router that maps user input (e.g. `init`, `deploy docker`) to inline workflows. Workflows read reference files on demand — they never bulk-load all references.
 - **`references/`** — Knowledge base loaded lazily by workflows:
   - `frameworks/` — Per-framework watt.json configs (nextjs, express, fastify, koa, remix, astro, nestjs, php)
   - `deployment/` — Docker, Kubernetes, cloud deployment guides
-  - Topic files: enterprise, kafka, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting
+  - Topic files: enterprise, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting, wattpm-cli
+
+### Skills (`skills/kafka/`)
+- **`SKILL.md`** — Kafka integration skill. Routes kafka-related commands (hooks, producer, consumer, monitoring, tracing) to workflows that reference the kafka knowledge base.
+- **`references/kafka.md`** — Full Kafka reference: @platformatic/kafka client, kafka-hooks webhooks, consumer lag monitoring, OpenTelemetry instrumentation, Docker Compose setup.
+- **`references/migration.md`** — KafkaJS to @platformatic/kafka migration guide: API mapping, code examples, migration checklist.
 
 ### Agents (`agents/`)
 - **`watt-analyzer.md`** — Read-only sub-agent for framework detection. Only has `Read, Glob, Grep` tools.
