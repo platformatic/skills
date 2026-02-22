@@ -139,14 +139,11 @@ await app.listen(process.env.PORT || 3000, '0.0.0.0');
 
 **Solutions**:
 
-1. **Ensure TypeScript is installed**:
+1. **Use Node.js 22.19+** (native type stripping support)
+
+2. **Keep TypeScript for type-checking only (optional)**:
 ```bash
 npm install typescript --save-dev
-```
-
-2. **For development with watch mode**:
-```bash
-npm install tsx --save-dev
 ```
 
 3. **Update watt.json commands**:
@@ -154,9 +151,9 @@ npm install tsx --save-dev
 {
   "application": {
     "commands": {
-      "development": "tsx watch src/index.ts",
-      "build": "tsc",
-      "production": "node dist/index.js"
+      "development": "node --watch src/index.ts",
+      "build": "echo 'No build step required'",
+      "production": "node src/index.ts"
     }
   }
 }

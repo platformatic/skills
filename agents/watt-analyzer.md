@@ -54,7 +54,7 @@ Check for:
 
 Look for:
 - `watt.json` (already configured)
-- `platformatic.json` (older config format)
+- Legacy configuration files that should be migrated to `watt.json`
 - `.env` files (existing environment setup)
 - `Dockerfile` (existing containerization)
 - `docker-compose.yml` or `docker-compose.yaml`

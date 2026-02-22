@@ -91,7 +91,7 @@ When user requests Kafka consumer lag monitoring:
    ```bash
    npm install @platformatic/watt-plugin-kafka-health
    ```
-3. Add plugin to service `platformatic.json`
+3. Add plugin to service `watt.json`
 4. Configure lag threshold and check interval
 
 ---

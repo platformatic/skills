@@ -40,9 +40,9 @@
   "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
   "application": {
     "commands": {
-      "development": "tsx watch src/index.ts",
-      "build": "tsc",
-      "production": "node dist/index.js"
+      "development": "node --watch src/index.ts",
+      "build": "echo 'No build step required'",
+      "production": "node src/index.ts"
     }
   },
   "runtime": {
@@ -63,10 +63,8 @@
 npm install wattpm
 ```
 
-For TypeScript, also add:
-```bash
-npm install tsx typescript --save-dev
-```
+For TypeScript, no additional runtime tooling is required on Node.js 22+.
+If you use ESM imports in `.ts` files, set `"type": "module"` in `package.json` and use `import type` for type-only imports.
 
 ## Key Considerations
 
@@ -139,7 +137,8 @@ app.listen(port, '0.0.0.0');
 
 ### With TypeScript
 ```typescript
-import express, { Application } from 'express';
+import express from 'express';
+import type { Application } from 'express';
 
 const app: Application = express();
 const port = process.env.PORT || 3000;

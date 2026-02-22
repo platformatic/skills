@@ -20,7 +20,7 @@ The PHP stackable uses `@platformatic/php-node`, a Rust-based native module that
 
 ## Requirements
 
-- Node.js >= 22.14.0
+- Node.js >= 22.19.0
 - PHP binary dependencies installed (see [php-node repository](https://github.com/platformatic/php-node))
 - For WordPress/Laravel with database: MySQL/MariaDB
 
@@ -32,7 +32,7 @@ The PHP stackable uses `@platformatic/php-node`, a Rust-based native module that
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/1.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
   "module": "@platformatic/php",
   "docroot": "./public",
   "application": {
@@ -97,7 +97,7 @@ define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/1.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
   "module": "@platformatic/php",
   "docroot": "./public",
   "rewriter": {
@@ -163,7 +163,7 @@ laravel-app/
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/1.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
   "module": "@platformatic/php",
   "docroot": "./public",
   "runtime": {

@@ -108,6 +108,10 @@ https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json
 
 Where `{package}` is: `next`, `remix`, `astro`, `node`, or `php`.
 
+**Runtime placement rule:**
+- For single-config application files (e.g. `@platformatic/node`, `@platformatic/next`, etc.), put runtime settings under `runtime`.
+- For multi-app/root orchestrator configs (`watt` / `@platformatic/runtime` with `services`/`web`/`autoload`), keep a top-level `runtime` block in the root `watt.json`.
+
 ### Step 3: Install Dependencies
 
 Install wattpm:
