@@ -66,7 +66,9 @@ PLT_NEXT_WORKERS=4
 **Standalone Next.js app** - add to watt.json:
 ```json
 {
-  "workers": "{PLT_NEXT_WORKERS}"
+  "runtime": {
+    "workers": "{PLT_NEXT_WORKERS}"
+  }
 }
 ```
 

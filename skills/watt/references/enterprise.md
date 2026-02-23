@@ -37,18 +37,18 @@ my-enterprise-app/
 ├── .env
 └── web/
     ├── composer/                # API Gateway
-    │   └── platformatic.json
+    │   └── watt.json
     ├── frontend/                # Next.js/Remix frontend
-    │   ├── platformatic.json
+    │   ├── watt.json
     │   └── src/
     ├── api/                     # Fastify API service
-    │   ├── platformatic.json
+    │   ├── watt.json
     │   └── src/
     ├── db/                      # Platformatic DB service
-    │   ├── platformatic.json
+    │   ├── watt.json
     │   └── migrations/
     └── worker/                  # Background worker service
-        ├── platformatic.json
+        ├── watt.json
         └── src/
 ```
 
@@ -58,9 +58,11 @@ my-enterprise-app/
 ```json
 {
   "$schema": "https://schemas.platformatic.dev/watt/2.0.0.json",
-  "server": {
-    "hostname": "0.0.0.0",
-    "port": "{PORT}"
+  "runtime": {
+    "server": {
+      "hostname": "0.0.0.0",
+      "port": "{PORT}"
+    }
   },
   "autoload": {
     "path": "web"
@@ -138,7 +140,7 @@ Composer acts as the central orchestration service, routing requests to appropri
 
 ### Composer Configuration
 
-`web/composer/platformatic.json`:
+`web/composer/watt.json`:
 ```json
 {
   "$schema": "https://schemas.platformatic.dev/composer/2.0.0.json",
@@ -267,7 +269,7 @@ Auto-generate REST and GraphQL APIs from your database schema.
 
 ### DB Service Configuration
 
-`web/db/platformatic.json`:
+`web/db/watt.json`:
 ```json
 {
   "$schema": "https://schemas.platformatic.dev/@platformatic/db/3.0.0.json",
@@ -325,7 +327,14 @@ For organizations with microservices in separate Git repositories.
       "path": "{PLT_ORDER_SERVICE_PATH}",
       "url": "https://github.com/your-org/order-service.git"
     }
-  ]
+  ],
+  "runtime": {
+    "logger": { "level": "{PLT_SERVER_LOGGER_LEVEL}" },
+    "server": {
+      "hostname": "{PLT_SERVER_HOSTNAME}",
+      "port": "{PORT}"
+    }
+  }
 }
 ```
 
@@ -412,22 +421,22 @@ enterprise-app/
 ├── docker-compose.yml
 └── web/
     ├── gateway/
-    │   └── platformatic.json      # Composer config
+    │   └── watt.json      # Composer config
     ├── dashboard/
-    │   ├── platformatic.json      # Next.js config
+    │   ├── watt.json      # Next.js config
     │   ├── next.config.mjs
     │   └── app/
     ├── users-api/
-    │   ├── platformatic.json      # Fastify config
+    │   ├── watt.json      # Fastify config
     │   └── routes/
     ├── users-db/
-    │   ├── platformatic.json      # DB config
+    │   ├── watt.json      # DB config
     │   └── migrations/
     ├── products-api/
-    │   ├── platformatic.json
+    │   ├── watt.json
     │   └── routes/
     └── products-db/
-        ├── platformatic.json
+        ├── watt.json
         └── migrations/
 ```
 

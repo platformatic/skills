@@ -48,15 +48,15 @@ my-app/
 ├── watt.json
 ├── web/
 │   ├── composer/
-│   │   └── platformatic.json
+│   │   └── watt.json
 │   ├── storefront/          # Next.js frontend
-│   │   ├── platformatic.json
+│   │   ├── watt.json
 │   │   └── app/
 │   ├── api/                 # Business API
-│   │   ├── platformatic.json
+│   │   ├── watt.json
 │   │   └── src/
 │   └── content-worker/      # CMS webhooks
-│       ├── platformatic.json
+│       ├── watt.json
 │       └── src/
 ```
 
@@ -64,18 +64,31 @@ my-app/
 
 ## Content Worker Service
 
-### platformatic.json
+### watt.json
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/service/2.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/service/3.0.0.json",
   "service": {
     "openapi": true
   },
   "plugins": {
-    "paths": ["./src/app.ts"],
-    "typescript": true
+    "paths": ["./src/app.ts"]
   }
+}
+```
+
+Install in `web/content-worker`:
+
+```bash
+npm install @platformatic/service fastify
+```
+
+Ensure `package.json` is ESM:
+
+```json
+{
+  "type": "module"
 }
 ```
 
@@ -83,7 +96,7 @@ my-app/
 
 ```typescript
 // src/app.ts
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 export default async function (fastify: FastifyInstance) {
   // Health check

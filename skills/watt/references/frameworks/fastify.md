@@ -62,9 +62,9 @@
   "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
   "application": {
     "commands": {
-      "development": "tsx watch src/index.ts",
-      "build": "tsc",
-      "production": "node dist/index.js"
+      "development": "node --watch src/index.ts",
+      "build": "echo 'No build step required'",
+      "production": "node src/index.ts"
     }
   },
   "runtime": {
@@ -85,26 +85,41 @@
 npm install wattpm
 ```
 
+If you use Platformatic Service in a multi-service setup, also install:
+
+```bash
+npm install @platformatic/service
+```
+
 ---
 
 ## Platformatic Service (Recommended for Multi-Service)
 
 When running Fastify as a service within Watt's multi-service architecture, use Platformatic Service configuration:
 
-### platformatic.json (in service directory)
+### watt.json (in service directory)
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/service/2.0.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/service/3.0.0.json",
   "service": {
     "openapi": true
   },
   "plugins": {
-    "paths": ["./src/app.ts"],
-    "typescript": true
+    "paths": ["./src/app.ts"]
   }
 }
 ```
+
+### package.json (TypeScript + ESM)
+
+```json
+{
+  "type": "module"
+}
+```
+
+Use type-only imports for Fastify types:
 
 ### Plugin Registration Pattern
 
@@ -112,7 +127,7 @@ Export a default async function that receives the Fastify instance:
 
 ```typescript
 // src/app.ts
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 export default async function (fastify: FastifyInstance) {
   // Register routes directly
@@ -129,7 +144,7 @@ export default async function (fastify: FastifyInstance) {
 | Option | Description |
 |--------|-------------|
 | `service.openapi: true` | Auto-generate OpenAPI/Swagger documentation |
-| `plugins.typescript: true` | Enable TypeScript compilation |
+| Node.js type stripping (v22+) | Runs `.ts` plugins without `plugins.typescript` |
 | `plugins.paths` | Array of plugin files to load |
 
 ### OpenAPI Documentation

@@ -47,7 +47,7 @@ Create `watt.json` in your project root:
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.33.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
   "application": {
     "main": "index.js"
   }
@@ -228,7 +228,7 @@ module.exports = { create }
 
 ```json
 {
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.33.0.json",
+  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
   "application": {
     "main": "src/server.js",
     "commands": {
@@ -291,17 +291,17 @@ API_KEY=your-api-key
 
 ### TypeScript projects
 
-For TypeScript, either:
-- Build first: `npm run build && npx wattpm start`
-- Use tsx: Update `watt.json` main to use compiled output
+For TypeScript on Node.js 22.19+, you can run `.ts` entrypoints directly with native type stripping:
 
 ```json
 {
   "application": {
-    "main": "dist/index.js"
+    "main": "src/index.ts"
   }
 }
 ```
+
+If your project still requires transpilation (framework-specific transforms), keep using your build output.
 
 ---
 

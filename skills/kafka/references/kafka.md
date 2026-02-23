@@ -108,7 +108,7 @@ npx wattpm@latest create
 # Select @platformatic/kafka-hooks from the list
 ```
 
-### Configuration (platformatic.json)
+### Configuration (watt.json)
 
 ```json
 {
@@ -257,11 +257,11 @@ kafka-app/
 ├── docker-compose.yml
 └── web/
     ├── gateway/
-    │   └── platformatic.json
+    │   └── watt.json
     ├── kafka-hooks/
-    │   └── platformatic.json      # Kafka-hooks config
+    │   └── watt.json      # Kafka-hooks config
     ├── api/
-    │   └── platformatic.json
+    │   └── watt.json
     └── worker/
         └── src/
             └── consumer.ts        # Kafka consumer
@@ -291,7 +291,7 @@ kafka-app/
 
 ### Kafka-Hooks Service Config
 
-`web/kafka-hooks/platformatic.json`:
+`web/kafka-hooks/watt.json`:
 ```json
 {
   "$schema": "https://schemas.platformatic.dev/@platformatic/kafka-hooks/1.0.0.json",

@@ -221,6 +221,11 @@ Guides through migrating an existing Node.js app:
 }
 ```
 
+### Runtime Placement Rule
+
+- **Single-config application schema** (`@platformatic/node`, `@platformatic/next`, `@platformatic/remix`, `@platformatic/astro`, `@platformatic/php`): use a `runtime` block for runtime settings (`logger`, `server`, `workers`, telemetry, etc.).
+- **Root multi-app orchestrator schema** (`watt` / `@platformatic/runtime`): keep runtime settings in the root-level `runtime` block.
+
 ### Environment Variables
 
 | Variable | Description | Default |
