@@ -20,13 +20,13 @@ Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 ### Any Skills-Compatible Agent
 
 ```bash
-npx skills add platformatic/watt-skill
+npx skills add platformatic/skills
 ```
 
 Or clone the repository and point your agent at the `skills/` directory:
 
 ```bash
-git clone https://github.com/platformatic/watt-skill.git
+git clone https://github.com/platformatic/skills.git
 ```
 
 ### Claude Code
@@ -229,5 +229,5 @@ Apache-2.0 - See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/platformatic/watt-skill/issues)
+- **Issues**: [GitHub Issues](https://github.com/platformatic/skills/issues)
 - **Discord**: [Platformatic Community](https://discord.gg/platformatic)
