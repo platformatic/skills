@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Claude Code plugin** (not a Node.js application). There is no package.json, no build system, no source code, and no tests. The entire project is structured Markdown files that Claude Code reads and executes as instructions, workflows, and reference documentation.
+**Repository**: `platformatic/skills` (https://github.com/platformatic/skills)
 
-The plugin gives Claude Code the knowledge to help users integrate [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) into Node.js and PHP projects — framework detection, `watt.json` generation, dependency installation, deployment configs, and more.
+This is an **Agent Skill** following the [Agent Skills open standard](https://agentskills.io/) (not a Node.js application). There is no package.json, no build system, no source code, and no tests. The entire project is structured Markdown files that agents read and execute as instructions, workflows, and reference documentation.
+
+The `skills/` directory is portable across any skills-compatible agent (Claude Code, Cursor, GitHub Copilot, Gemini CLI, etc.). The `agents/`, `commands/`, and `.claude-plugin/` directories are Claude Code-specific extensions that add slash commands and sub-agents.
+
+The skill gives agents the knowledge to help users integrate [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) into Node.js and PHP projects — framework detection, `watt.json` generation, dependency installation, deployment configs, and more.
 
 ## Testing
 
