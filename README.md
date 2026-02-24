@@ -1,6 +1,8 @@
-# Platformatic Watt Skill for Claude Code
+# Platformatic Watt Agent Skill
 
-A Claude Code plugin for integrating and deploying [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) in any Node.js project.
+An [Agent Skill](https://agentskills.io/) for integrating and deploying [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) in any Node.js project. Works with any skills-compatible agent: Claude Code, Cursor, GitHub Copilot, Gemini CLI, Junie, and [more](https://skills.sh/).
+
+Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 
 ## Features
 
@@ -8,172 +10,80 @@ A Claude Code plugin for integrating and deploying [Platformatic Watt](https://d
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
-- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks (separate `/kafka` skill)
+- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks (separate `kafka` skill)
 - **Scheduled Jobs**: Cron-based task scheduling with retry support
 - **CMS Integration**: Headless CMS webhooks and cache invalidation (Contentful, Sanity, Strapi)
 - **Observability**: Logging (Pino), tracing (OpenTelemetry), metrics (Prometheus)
-- **Status Checking**: Verify your Watt setup with a single command
 
 ## Installation
 
-### From Plugin Directory (Development)
+### Any Skills-Compatible Agent
 
 ```bash
-# Clone the repository
-git clone https://github.com/platformatic/watt-skill.git
+npx skills add platformatic/watt-skill
+```
 
-# Use with Claude Code
+Or clone the repository and point your agent at the `skills/` directory:
+
+```bash
+git clone https://github.com/platformatic/watt-skill.git
+```
+
+### Claude Code
+
+```bash
+# As a plugin (enables slash commands)
 claude --plugin-dir ./watt-skill
 ```
 
-### From npm (When Published)
+## Skills
 
-```bash
-# Install globally
-npm install -g @platformatic/watt-skill
+This repository contains two skills, each a standalone `SKILL.md` following the [Agent Skills specification](https://agentskills.io/specification):
 
-# Or use with Claude Code
-/plugin install @platformatic/watt-skill
-```
+### `watt` — Platformatic Watt Integration
+
+Detects your framework, generates `watt.json`, installs dependencies, and creates deployment configs.
+
+**Capabilities**: init, deploy (Docker/Kubernetes/cloud), migrate, enterprise multi-service setup, wattpm CLI guidance, scheduled jobs, CMS integration, observability.
+
+### `kafka` — Kafka Event-Driven Microservices
+
+Sets up event-driven architectures with @platformatic/kafka and kafka-hooks.
+
+**Capabilities**: producer/consumer setup, kafka-hooks webhooks, request/response patterns, consumer lag monitoring, OpenTelemetry tracing, KafkaJS migration.
 
 ## Usage
 
-### Initialize Watt in a Project
+Any skills-compatible agent will match these skills based on the `description` field in each `SKILL.md` and follow the workflow instructions. Just ask in natural language:
 
-```bash
-/watt
+- *"Add Watt to this Next.js project"*
+- *"Generate a Dockerfile for my Watt app"*
+- *"Deploy this to Kubernetes"*
+- *"Set up Kafka hooks for this service"*
+- *"Migrate from KafkaJS to @platformatic/kafka"*
+- *"Create a multi-service enterprise setup"*
+
+### Claude Code Slash Commands
+
+When loaded as a Claude Code plugin, the skills also expose slash commands with argument-based routing. These are Claude Code-specific and not part of the Agent Skills standard:
+
 ```
+/watt                     # auto-detect and integrate
+/watt init nextjs         # integrate with framework hint
+/watt deploy docker       # generate Docker config
+/watt deploy k8s          # generate Kubernetes manifests
+/watt enterprise          # multi-service setup
+/watt migrate             # migrate existing app
+/watt cli                 # wattpm CLI reference
+/watt status              # check Watt configuration health
 
-This will:
-1. Detect your framework (Next.js, Express, Fastify, etc.)
-2. Generate appropriate `watt.json` configuration
-3. Install required dependencies (`wattpm`, `@platformatic/*`)
-4. Update `package.json` scripts
-5. Create `.env` file with defaults
-
-### Initialize with Framework Hint
-
-```bash
-/watt init nextjs
-/watt init express
-/watt init fastify
+/kafka                    # Kafka overview
+/kafka hooks              # kafka-hooks webhooks
+/kafka producer           # producer setup
+/kafka consumer           # consumer setup
+/kafka monitoring         # consumer lag monitoring
+/kafka migrate            # KafkaJS migration guide
 ```
-
-### Check Watt Configuration Status
-
-```bash
-/watt status
-```
-
-Outputs:
-```
-Watt Configuration Status
-=========================
-Node.js Version:  v22.19.0       [OK]
-watt.json:        Found          [OK]
-Configuration:    Valid JSON     [OK]
-wattpm:           v3.2.0         [OK]
-Scripts:          Configured     [OK]
-
-Status: Ready to run
-```
-
-### Deploy with Docker
-
-```bash
-/watt deploy docker
-```
-
-Generates:
-- `Dockerfile` (multi-stage, optimized)
-- `.dockerignore`
-- `docker-compose.yml` (optional)
-
-### Deploy to Kubernetes
-
-```bash
-/watt deploy k8s
-```
-
-Generates:
-- `k8s/deployment.yaml`
-- `k8s/service.yaml`
-- `k8s/configmap.yaml`
-- `k8s/hpa.yaml` (autoscaling)
-
-### Deploy to Cloud Platforms
-
-```bash
-/watt deploy cloud
-/watt deploy fly
-/watt deploy railway
-```
-
-Generates platform-specific configuration files.
-
-### Kafka Integration
-
-```bash
-/kafka
-/kafka hooks
-/kafka producer
-/kafka consumer
-/kafka monitoring
-```
-
-### Migrate from KafkaJS
-
-```bash
-/kafka migrate
-/kafka kafkajs
-```
-
-Guides through migrating from KafkaJS to @platformatic/kafka:
-- API mapping (factory pattern → direct instantiation)
-- Producer changes (topic per-message, built-in serializers)
-- Consumer changes (callback → stream-based)
-- Admin, transactions, error handling, and diagnostics
-
-Sets up event-driven microservices with:
-- @platformatic/kafka-hooks (webhooks, request/response, HTTP publishing)
-- @platformatic/kafka (direct producer/consumer)
-- Consumer lag monitoring and OpenTelemetry tracing
-
-### wattpm CLI Commands
-
-```bash
-/watt cli                   # overview of all wattpm commands
-/watt create                # scaffold a new project
-/watt inject                # test endpoints on a running app
-/watt logs                  # stream application logs
-/watt ps                    # list running instances
-/watt admin                 # launch Watt admin UI
-/watt resolve               # clone external applications
-```
-
-### Multi-Service Enterprise Setup
-
-```bash
-/watt enterprise
-/watt multi-service
-```
-
-Creates a multi-service architecture with:
-- Platformatic Composer (API gateway)
-- Multiple backend services
-- Inter-service communication via `{service-id}.plt.local`
-
-### Migrate Existing Application
-
-```bash
-/watt migrate
-/watt poc
-```
-
-Guides through migrating an existing Node.js app:
-- Prerequisites checklist
-- Entrypoint modification (`create`/`close` exports)
-- watt.json configuration
 
 ## Supported Frameworks
 
@@ -193,7 +103,6 @@ Guides through migrating an existing Node.js app:
 ## Requirements
 
 - **Node.js**: v22.19.0 or higher
-- **Claude Code**: Latest version
 
 ## Configuration Reference
 
@@ -234,15 +143,13 @@ Guides through migrating an existing Node.js app:
 | `PLT_SERVER_HOSTNAME` | Bind address | `0.0.0.0` |
 | `PLT_SERVER_LOGGER_LEVEL` | Log level | `info` |
 
-## Plugin Structure
+## Project Structure
 
 ```
 watt-skill/
-├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
 ├── skills/
 │   ├── watt/
-│   │   ├── SKILL.md             # Main skill
+│   │   ├── SKILL.md             # Watt integration skill
 │   │   └── references/
 │   │       ├── frameworks/      # Framework-specific configs
 │   │       ├── deployment/      # Deployment guides
@@ -250,34 +157,41 @@ watt-skill/
 │   └── kafka/
 │       ├── SKILL.md             # Kafka integration skill
 │       └── references/
-│           └── kafka.md         # Kafka reference docs
+│           ├── kafka.md         # Kafka reference docs
+│           └── migration.md     # KafkaJS migration guide
 ├── agents/
-│   └── watt-analyzer.md         # Project analysis agent
+│   └── watt-analyzer.md         # Project analysis sub-agent
 ├── commands/
-│   └── watt-status.md           # Status check command
+│   └── watt-status.md           # Status check (Claude Code)
+├── .claude-plugin/
+│   └── plugin.json              # Claude Code plugin manifest
 ├── README.md
 └── LICENSE
 ```
+
+The `skills/` directory follows the [Agent Skills specification](https://agentskills.io/specification). The `agents/`, `commands/`, and `.claude-plugin/` directories are Claude Code-specific extensions.
 
 ## Development
 
 ### Testing Locally
 
 ```bash
-# Start Claude Code with plugin
+# With Claude Code
 claude --plugin-dir /path/to/watt-skill
 
 # Test skill invocation
-/watt:watt
-/watt:watt-status
+/watt
+/watt-status
 ```
+
+For other agents, point your agent's skill configuration at the `skills/` directory.
 
 ### Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test with Claude Code
+4. Test with your agent of choice
 5. Submit a pull request
 
 ## Troubleshooting
@@ -305,7 +219,9 @@ PORT=3001 npm run dev
 
 - [Platformatic Watt Documentation](https://docs.platformatic.dev/docs/Overview)
 - [Watt 3 Announcement](https://blog.platformatic.dev/introducing-watt-3)
-- [Claude Code Skills Guide](https://code.claude.com/docs/en/skills)
+- [Agent Skills Standard](https://agentskills.io/) — open format specification
+- [Skills.sh Directory](https://skills.sh/) — discover and install agent skills
+- [Claude Code Skills Guide](https://code.claude.com/docs/en/skills) — Claude Code-specific docs
 
 ## License
 
