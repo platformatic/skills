@@ -278,12 +278,26 @@ module.exports = async function (fastify, opts) {
 
 ## Graceful Shutdown
 
-Fastify handles graceful shutdown automatically. Watt coordinates with this:
+If your `@platformatic/node` entrypoint exports `create()` and returns a Fastify instance, Watt can call `app.close()` automatically. You can still add Fastify-specific cleanup hooks:
 ```javascript
-// Optional: custom close handlers
 fastify.addHook('onClose', async (instance) => {
   // Cleanup connections
-});
+})
+```
+
+If your entrypoint starts listening by itself instead of returning the Fastify instance, export a `close()` function so Watt can stop it cleanly. If you also want to react to Watt shutdown events, use `@platformatic/globals` instead of typing `globalThis.platformatic` manually:
+```javascript
+const { getGlobal } = require('@platformatic/globals')
+
+async function close() {
+  await fastify.close()
+}
+
+getGlobal()?.events?.on('close', () => {
+  void close()
+})
+
+module.exports = { close }
 ```
 
 ## Common Issues

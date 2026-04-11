@@ -60,6 +60,8 @@ Replace `index.js` with your actual application entrypoint (e.g., `src/server.js
 
 Your entrypoint file should export one of:
 
+> Prefer `create()` whenever possible. For `@platformatic/node` black-box entrypoints that call `listen()` themselves, also provide a shutdown path (`close()` and/or a Platformatic `close` event handler) so Watt can stop the app cleanly without exit-timeout warnings.
+
 #### Option A: Export a `create` function (Recommended)
 
 ```javascript
@@ -104,6 +106,21 @@ async function close() {
 }
 
 module.exports = { close }
+```
+
+If you need to hook into Watt shutdown events without making Watt a hard runtime requirement, use `@platformatic/globals`:
+
+```bash
+npm install @platformatic/globals
+```
+
+```javascript
+const { getGlobal } = require('@platformatic/globals')
+
+const platformatic = getGlobal()
+platformatic?.events?.on('close', () => {
+  void close()
+})
 ```
 
 ### Step 4: Run with Watt

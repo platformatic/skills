@@ -171,12 +171,22 @@ Ensure you're binding to `0.0.0.0` not `localhost`.
 Check that all environment variables are available. Use `.env` file for local development.
 
 ### Graceful shutdown
-Express doesn't handle graceful shutdown by default. Watt manages this, but you can add your own handlers:
+If your `@platformatic/node` entrypoint returns an app from `create()`, Watt owns the listening socket and you usually do not need extra shutdown code. If your entrypoint starts listening by itself, export a `close()` function so Watt can stop it cleanly:
 ```javascript
-process.on('SIGTERM', () => {
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+async function close() {
+  return new Promise((resolve) => {
+    server.close(resolve)
+  })
+}
+
+module.exports = { close }
+```
+
+If you need to react to Watt shutdown events, use `@platformatic/globals` instead of typing `globalThis.platformatic` manually:
+```javascript
+const { getGlobal } = require('@platformatic/globals')
+
+getGlobal()?.events?.on('close', () => {
+  void close()
+})
 ```

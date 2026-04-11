@@ -197,7 +197,7 @@ When user wants to migrate an existing app or prepare for a POC:
    - Database/API access available
 3. Install: `npm install wattpm` (or use `npx wattpm`)
 4. Create `watt.json` with application entrypoint
-5. Modify entrypoint to export `create` function (returns server) or `close` function
+5. Modify the entrypoint to prefer exporting a `create` function (returns the app/server). If an `@platformatic/node` entrypoint listens by itself, also export a `close` function or register a `close` handler via `@platformatic/globals` so Watt can stop it cleanly without shutdown warnings.
 6. Test with `npx wattpm dev` and `npx wattpm start`
 
 ### Entrypoint Pattern (Express Example)
