@@ -9,9 +9,12 @@ description: |
   - "dead letter queue", "DLQ"
   - "request response pattern" with Kafka
   - "migrate from kafkajs", "kafkajs migration", "replace kafkajs"
+  - "node-rdkafka", "node rdkafka", "rdkafka", "librdkafka"
+  - "migrate from node-rdkafka", "replace node-rdkafka"
+  - "Kafka.Producer", "Kafka.KafkaConsumer", "ProducerStream", "ConsumerStream"
   Covers @platformatic/kafka, @platformatic/kafka-hooks, consumer lag monitoring,
-  and OpenTelemetry instrumentation.
-argument-hint: "[hooks|producer|consumer|monitoring]"
+  OpenTelemetry instrumentation, and migrations from KafkaJS or node-rdkafka.
+argument-hint: "[hooks|producer|consumer|monitoring|migrate kafkajs|migrate node-rdkafka]"
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit
 ---
 
@@ -45,7 +48,9 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `producer`, `consumer`, `client` | Run **Kafka Client Setup** |
 | `monitoring`, `lag`, `health` | Run **Consumer Lag Monitoring Setup** |
 | `tracing`, `opentelemetry`, `otel` | Run **Kafka Tracing Setup** |
-| `migrate`, `kafkajs`, `migration` | Run **KafkaJS Migration Workflow** |
+| `migrate kafkajs`, `kafkajs`, `replace kafkajs` | Run **KafkaJS Migration Workflow** |
+| `migrate node-rdkafka`, `node-rdkafka`, `node rdkafka`, `rdkafka`, `librdkafka`, `Kafka.Producer`, `Kafka.KafkaConsumer`, `ProducerStream`, `ConsumerStream` | Run **node-rdkafka Migration Workflow** |
+| `migrate`, `migration` | Run **Migration Detection Workflow** |
 
 ---
 
@@ -113,7 +118,7 @@ When user requests OpenTelemetry tracing for Kafka:
 
 When user wants to migrate from KafkaJS to @platformatic/kafka:
 
-1. Read [references/migration.md](references/migration.md)
+1. Read [references/kafkajs-migration.md](references/kafkajs-migration.md)
 2. Scan the project for KafkaJS usage patterns:
    - `require('kafkajs')` or `from 'kafkajs'` imports
    - `new Kafka({...})` factory instantiation
@@ -133,6 +138,41 @@ When user wants to migrate from KafkaJS to @platformatic/kafka:
    - Admin API (new method signatures)
    - Error handling (`retriable` → `canRetry`, new error classes)
    - Events (custom events → `diagnostics_channel`)
+
+---
+
+## node-rdkafka Migration Workflow
+
+When user wants to migrate from node-rdkafka to @platformatic/kafka:
+
+1. Read [references/node-rdkafka-migration.md](references/node-rdkafka-migration.md)
+2. Scan the project for node-rdkafka usage patterns:
+   - `require('node-rdkafka')` or `from 'node-rdkafka'` imports
+   - `new Kafka.Producer(...)`
+   - `new Kafka.KafkaConsumer(...)`
+   - `Kafka.Producer.createWriteStream(...)`
+   - `Kafka.KafkaConsumer.createReadStream(...)`
+   - `.produce(...)`, `.poll()`, `.consume(...)`, `.subscribe(...)`
+   - `.connect(...)`, `.disconnect(...)`, `.on('ready')`, `.on('data')`, `.on('event.error')`
+   - `.getMetadata(...)`
+   - librdkafka options such as `metadata.broker.list`, `group.id`, `enable.auto.commit`, `security.protocol`, `sasl.mechanisms`
+3. Replace `node-rdkafka` with `@platformatic/kafka` in dependencies using the detected package manager
+4. Transform producers first, then consumers, then stream wrappers, then metadata/admin usage
+5. Update shutdown paths from callback/event disconnects to `await client.close()`
+6. Verify the migration checklist from the reference
+
+---
+
+## Migration Detection Workflow
+
+When user asks for a Kafka migration but does not specify the source client:
+
+1. Inspect `package.json` and lockfiles for `kafkajs` or `node-rdkafka`
+2. Search source files for imports from `kafkajs` or `node-rdkafka`
+3. If KafkaJS is found, run **KafkaJS Migration Workflow**
+4. If node-rdkafka is found, run **node-rdkafka Migration Workflow**
+5. If both are found, migrate one client at a time and start with the one with fewer call sites
+6. If neither is found, ask the user which Kafka client they are migrating from
 
 ---
 
