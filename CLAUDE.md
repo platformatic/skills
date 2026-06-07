@@ -38,9 +38,10 @@ The plugin exposes three component types, each a Markdown file with YAML frontma
   - Topic files: enterprise, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting, wattpm-cli
 
 ### Skills (`skills/kafka/`)
-- **`SKILL.md`** — Kafka integration skill. Routes kafka-related commands (hooks, producer, consumer, monitoring, tracing) to workflows that reference the kafka knowledge base.
+- **`SKILL.md`** — Kafka integration skill. Routes kafka-related commands (hooks, producer, consumer, monitoring, tracing, migrations) to workflows that reference the kafka knowledge base.
 - **`references/kafka.md`** — Full Kafka reference: @platformatic/kafka client, kafka-hooks webhooks, consumer lag monitoring, OpenTelemetry instrumentation, Docker Compose setup.
-- **`references/migration.md`** — KafkaJS to @platformatic/kafka migration guide: API mapping, code examples, migration checklist.
+- **`references/kafkajs-migration.md`** — KafkaJS to @platformatic/kafka migration guide: API mapping, code examples, migration checklist.
+- **`references/node-rdkafka-migration.md`** — node-rdkafka to @platformatic/kafka migration guide: librdkafka configuration mapping, producer/consumer API examples, stream migration, metadata/admin migration, error handling, shutdown, and verification checklist.
 
 ### Agents (`agents/`)
 - **`watt-analyzer.md`** — Read-only sub-agent for framework detection. Only has `Read, Glob, Grep` tools.

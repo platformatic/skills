@@ -25,7 +25,7 @@ A modern, high-performance, pure TypeScript/JavaScript Kafka client with no nati
 - **High Performance**: Optimized for speed
 - **Pure JavaScript**: No native addons required
 - **Type Safety**: Full TypeScript support
-- **Streaming Consumers**: Node.js Readable streams
+- **Streaming Producers and Consumers**: Producer `Writable` streams and consumer `Readable` streams
 - **Flexible Serialization**: Pluggable serializers/deserializers
 - **Connection Management**: Automatic pooling and recovery
 
@@ -57,6 +57,38 @@ await producer.send({
 
 await producer.close()
 ```
+
+### Producer Stream Example
+
+Use `producer.asStream()` when you already have a Node.js stream pipeline, want automatic batching, or want stream backpressure to regulate production.
+
+```typescript
+import { Producer, ProducerStreamReportModes, stringSerializers } from '@platformatic/kafka'
+
+const producer = new Producer({
+  clientId: 'my-producer',
+  bootstrapBrokers: ['localhost:9092'],
+  serializers: stringSerializers
+})
+
+const stream = producer.asStream({
+  batchSize: 100,
+  batchTime: 50,
+  reportMode: ProducerStreamReportModes.BATCH
+})
+
+stream.on('delivery-report', report => {
+  console.log(report)
+})
+
+stream.write({ topic: 'events', key: 'user-1', value: 'login' })
+stream.write({ topic: 'events', key: 'user-2', value: 'logout' })
+
+await stream.close()
+await producer.close()
+```
+
+Producer streams are tracked by the producer. Close streams before `producer.close()`, or use `producer.close(true)` during shutdown to force-close active streams.
 
 ### Consumer Example
 

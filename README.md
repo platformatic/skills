@@ -10,7 +10,7 @@ Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
-- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks (separate `kafka` skill)
+- **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks and migrations from KafkaJS or node-rdkafka (separate `kafka` skill)
 - **Scheduled Jobs**: Cron-based task scheduling with retry support
 - **CMS Integration**: Headless CMS webhooks and cache invalidation (Contentful, Sanity, Strapi)
 - **Observability**: Logging (Pino), tracing (OpenTelemetry), metrics (Prometheus)
@@ -50,7 +50,7 @@ Detects your framework, generates `watt.json`, installs dependencies, and create
 
 Sets up event-driven architectures with @platformatic/kafka and kafka-hooks.
 
-**Capabilities**: producer/consumer setup, kafka-hooks webhooks, request/response patterns, consumer lag monitoring, OpenTelemetry tracing, KafkaJS migration.
+**Capabilities**: producer/consumer setup, kafka-hooks webhooks, request/response patterns, consumer lag monitoring, OpenTelemetry tracing, KafkaJS migration, node-rdkafka migration.
 
 ## Usage
 
@@ -61,6 +61,7 @@ Any skills-compatible agent will match these skills based on the `description` f
 - *"Deploy this to Kubernetes"*
 - *"Set up Kafka hooks for this service"*
 - *"Migrate from KafkaJS to @platformatic/kafka"*
+- *"Migrate from node-rdkafka to @platformatic/kafka"*
 - *"Create a multi-service enterprise setup"*
 
 ### Claude Code Slash Commands
@@ -82,7 +83,8 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 /kafka producer           # producer setup
 /kafka consumer           # consumer setup
 /kafka monitoring         # consumer lag monitoring
-/kafka migrate            # KafkaJS migration guide
+/kafka migrate kafkajs    # KafkaJS migration guide
+/kafka migrate node-rdkafka  # node-rdkafka migration guide
 ```
 
 ## Supported Frameworks
@@ -158,7 +160,8 @@ watt-skill/
 │       ├── SKILL.md             # Kafka integration skill
 │       └── references/
 │           ├── kafka.md         # Kafka reference docs
-│           └── migration.md     # KafkaJS migration guide
+│           ├── kafkajs-migration.md        # KafkaJS migration guide
+│           └── node-rdkafka-migration.md   # node-rdkafka migration guide
 ├── agents/
 │   └── watt-analyzer.md         # Project analysis sub-agent
 ├── commands/
