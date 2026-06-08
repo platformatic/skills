@@ -52,6 +52,12 @@ Sets up event-driven architectures with @platformatic/kafka and kafka-hooks.
 
 **Capabilities**: producer/consumer setup, kafka-hooks webhooks, request/response patterns, consumer lag monitoring, OpenTelemetry tracing, KafkaJS migration, node-rdkafka migration.
 
+### `workflow` — Vercel Workflow SDK with `@platformatic/world`
+
+Helps build applications that use the Vercel Workflow SDK against a self-hosted Platformatic Workflow Service via `@platformatic/world`.
+
+**Capabilities**: install + env-var wiring, Next.js `instrumentation.ts`, generic Node `world.start()`, optional `@platformatic/workflow-fastify` plugin, authoring workflows and steps (`'use workflow'` / `'use step'`, retries, hooks, sleeps, streams), triggering runs, standalone build, troubleshooting.
+
 ## Usage
 
 Any skills-compatible agent will match these skills based on the `description` field in each `SKILL.md` and follow the workflow instructions. Just ask in natural language:
@@ -63,6 +69,9 @@ Any skills-compatible agent will match these skills based on the `description` f
 - *"Migrate from KafkaJS to @platformatic/kafka"*
 - *"Migrate from node-rdkafka to @platformatic/kafka"*
 - *"Create a multi-service enterprise setup"*
+- *"Add the Vercel Workflow SDK to my Next.js app with @platformatic/world"*
+- *"Wire @platformatic/workflow-fastify into my Fastify server"*
+- *"How do I author a workflow with 'use workflow' and 'use step'?"*
 
 ### Claude Code Slash Commands
 
@@ -85,6 +94,15 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 /kafka monitoring         # consumer lag monitoring
 /kafka migrate kafkajs    # KafkaJS migration guide
 /kafka migrate node-rdkafka  # node-rdkafka migration guide
+
+/workflow                 # auto-detect and wire @platformatic/world
+/workflow next            # Next.js instrumentation.ts setup
+/workflow node            # generic Node setup with explicit world.start()
+/workflow fastify         # set up @platformatic/workflow-fastify
+/workflow author          # how to write 'use workflow' / 'use step' files
+/workflow trigger         # how to call start() / resumeHook()
+/workflow build           # workflow build --target standalone walkthrough
+/workflow status          # check Workflow SDK configuration health
 ```
 
 ## Supported Frameworks
@@ -156,12 +174,19 @@ watt-skill/
 │   │       ├── frameworks/      # Framework-specific configs
 │   │       ├── deployment/      # Deployment guides
 │   │       └── troubleshooting.md
-│   └── kafka/
-│       ├── SKILL.md             # Kafka integration skill
+│   ├── kafka/
+│   │   ├── SKILL.md             # Kafka integration skill
+│   │   └── references/
+│   │       ├── kafka.md         # Kafka reference docs
+│   │       ├── kafkajs-migration.md        # KafkaJS migration guide
+│   │       └── node-rdkafka-migration.md   # node-rdkafka migration guide
+│   └── workflow/
+│       ├── SKILL.md             # Vercel Workflow SDK + @platformatic/world skill
 │       └── references/
-│           ├── kafka.md         # Kafka reference docs
-│           ├── kafkajs-migration.md        # KafkaJS migration guide
-│           └── node-rdkafka-migration.md   # node-rdkafka migration guide
+│           ├── world.md         # @platformatic/world adapter reference
+│           ├── authoring.md     # 'use workflow' / 'use step' authoring guide
+│           ├── fastify.md       # @platformatic/workflow-fastify plugin
+│           └── troubleshooting.md          # common workflow pitfalls
 ├── agents/
 │   └── watt-analyzer.md         # Project analysis sub-agent
 ├── commands/

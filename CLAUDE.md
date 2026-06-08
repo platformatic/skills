@@ -43,6 +43,13 @@ The plugin exposes three component types, each a Markdown file with YAML frontma
 - **`references/kafkajs-migration.md`** — KafkaJS to @platformatic/kafka migration guide: API mapping, code examples, migration checklist.
 - **`references/node-rdkafka-migration.md`** — node-rdkafka to @platformatic/kafka migration guide: librdkafka configuration mapping, producer/consumer API examples, stream migration, metadata/admin migration, error handling, shutdown, and verification checklist.
 
+### Skills (`skills/workflow/`)
+- **`SKILL.md`** — Vercel Workflow SDK skill. Routes commands (init, next, node, fastify, author, trigger, build, status, troubleshoot) for building apps that use the Vercel Workflow SDK with `@platformatic/world`. Scope is client-side only — it does not cover deploying the Workflow Service.
+- **`references/world.md`** — `@platformatic/world` reference: install, env vars (`WORKFLOW_TARGET_WORLD`, `PLT_WORLD_SERVICE_URL`, etc.), `createWorld()` / `createPlatformaticWorld()`, Next.js `instrumentation.ts`, manual `world.start()`, triggering runs, SDK compatibility (4.2.x / 5.0.0-beta.x).
+- **`references/authoring.md`** — Authoring guide for the Vercel SDK itself: `'use workflow'` / `'use step'` directives, retries, hooks (human-in-the-loop + webhook), sleeps, streams, determinism rules, file layout, build targets.
+- **`references/fastify.md`** — Optional `@platformatic/workflow-fastify` plugin: install, options (`buildDir`, `register`), standalone-build extension handling, when not to use the plugin.
+- **`references/troubleshooting.md`** — Common pitfalls: runs stuck in `pending`, missing env vars, missing standalone build, `CorruptedEventLogError`, cursor-missing warning, transform not applied, hook never resumes.
+
 ### Agents (`agents/`)
 - **`watt-analyzer.md`** — Read-only sub-agent for framework detection. Only has `Read, Glob, Grep` tools.
 
