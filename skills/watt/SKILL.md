@@ -108,6 +108,18 @@ https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json
 
 Where `{package}` is: `next`, `remix`, `astro`, `node`, or `php`.
 
+To retrieve and inspect the schema before generating or validating a config, fetch it directly from the schema service. Schema URLs follow this pattern:
+
+```text
+https://schemas.platformatic.dev/<module>/<version>.json
+```
+
+`<module>` can be a bare module name or an organization-scoped path (`<org>/<module>`), such as `@platformatic/node`; `<version>` is the capability version. For example, for the Node capability schema at version `3.55.0`:
+
+```bash
+curl -L https://schemas.platformatic.dev/@platformatic/node/3.55.0.json
+```
+
 **Runtime placement rule:**
 - For single-config application files (e.g. `@platformatic/node`, `@platformatic/next`, etc.), put runtime settings under `runtime`.
 - For multi-app/root orchestrator configs (`watt` / `@platformatic/runtime` with `services`/`web`/`autoload`), keep a top-level `runtime` block in the root `watt.json`.
@@ -119,7 +131,10 @@ Install wattpm:
 npm install wattpm
 ```
 
-For Next.js, Remix, Astro, or PHP, also install the specific stackable:
+For Next.js, Remix, Astro, or PHP, also install the specific capability:
+
+> Terminology note: older Platformatic documentation may refer to capabilities as "stackables". Treat "stackable" and "capability" as equivalent, but use "capability" in current documentation.
+
 ```bash
 npm install @platformatic/next    # for Next.js
 npm install @platformatic/remix   # for Remix

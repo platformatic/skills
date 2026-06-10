@@ -150,6 +150,24 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 }
 ```
 
+### Retrieving Schemas
+
+Fetch schemas directly from the Platformatic schema service when you need to inspect valid fields or validate generated config. Schema URLs follow this pattern:
+
+```text
+https://schemas.platformatic.dev/<module>/<version>.json
+```
+
+`<module>` can be a bare module name or an organization-scoped path (`<org>/<module>`), such as `@platformatic/node`; `<version>` is the capability version. For example, retrieve the Node capability schema at version `3.55.0` with:
+
+```bash
+curl -L https://schemas.platformatic.dev/@platformatic/node/3.55.0.json
+```
+
+### Terminology
+
+Older Platformatic documentation may refer to capabilities as "stackables". Treat "stackable" and "capability" as equivalent, but use "capability" in current documentation.
+
 ### Runtime Placement Rule
 
 - **Single-config application schema** (`@platformatic/node`, `@platformatic/next`, `@platformatic/remix`, `@platformatic/astro`, `@platformatic/php`): use a `runtime` block for runtime settings (`logger`, `server`, `workers`, telemetry, etc.).
