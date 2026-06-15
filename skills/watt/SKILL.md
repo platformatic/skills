@@ -45,6 +45,7 @@ Based on user input ($ARGUMENTS), route to the appropriate workflow:
 | `multi-service`, `enterprise`, `composer` | Run **Multi-Service Setup** |
 | `migrate`, `port`, `onboard`, `poc` | Run **Migration/POC Workflow** |
 | `observability`, `logging`, `tracing`, `metrics` | Run **Observability Setup** |
+| `performance`, `profile`, `profiling`, `flame`, `flamegraph`, `pprof`, `cpu`, `heap-snapshot` | Run **Performance Profiling** |
 | `scheduler`, `cron`, `jobs` | Run **Scheduler Setup** |
 | `cms`, `contentful`, `sanity`, `headless` | Run **CMS Integration Setup** |
 | `deploy docker` | Run **Docker Deployment** |
@@ -283,6 +284,45 @@ When user requests cron/scheduled jobs setup:
 
 ---
 
+## Performance Profiling
+
+When users ask about performance profiling, CPU profiles, flamegraphs, heap profiling, or heap snapshots:
+
+1. Read [references/performance.md](references/performance.md)
+2. Prefer Watt-native commands documented by `wattpm`:
+   - `wattpm pprof start [id] [application]` to start CPU profiling
+   - `wattpm pprof stop [id] [application]` to save `pprof-{application}-{timestamp}.pb`
+   - `wattpm heap-snapshot [id] [application]` for memory snapshots
+3. Use `@platformatic/flame` to generate HTML flamegraphs and markdown analysis from `.pb` files:
+   - `npm install -g @platformatic/flame`
+   - `flame generate pprof-api-application-2026-06-15T10-00-00-000Z.pb`
+   - `flame generate --md-format=detailed pprof-api-application-2026-06-15T10-00-00-000Z.pb`
+4. Use `flame run server.js` only for standalone Node.js scripts outside Watt.
+5. Use `wattpm ps` and `wattpm applications` to identify runtime and application IDs before profiling multi-application setups.
+6. Recommend profiling `wattpm start` for production-like CPU behavior.
+
+### Quick CPU Profile
+
+Start the app in one terminal:
+
+```bash
+wattpm build
+wattpm start
+```
+
+Then collect the profile from another terminal:
+
+```bash
+wattpm ps
+wattpm applications
+wattpm pprof start my-app api-application
+# Exercise the slow workload
+wattpm pprof stop my-app api-application
+flame generate pprof-api-application-2026-06-15T10-00-00-000Z.pb
+```
+
+---
+
 ## CMS Integration Setup
 
 When user requests headless CMS integration (Contentful, Sanity, Strapi, etc.):
@@ -415,6 +455,14 @@ wattpm env my-app --table        # view environment variables
 wattpm config my-app             # view configuration
 ```
 
+**Profiling a running app:**
+```bash
+wattpm applications my-app
+wattpm pprof start my-app api-service
+wattpm pprof stop my-app api-service
+wattpm heap-snapshot my-app api-service
+```
+
 **Working with external applications:**
 ```bash
 wattpm import . platformatic/acme-base --id base-app
@@ -446,6 +494,7 @@ Key optimizations:
 - Scale CPU limits proportionally (workers × 1000m)
 - Enable distributed caching with Valkey/Redis
 - Use `output: 'standalone'` for Next.js
+- Use `wattpm pprof start` and `wattpm pprof stop` to capture CPU profiles for flamegraph analysis
 
 ## Troubleshooting
 

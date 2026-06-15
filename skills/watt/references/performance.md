@@ -318,6 +318,137 @@ Metrics include:
 
 ---
 
+## CPU Profiling with pprof
+
+Use Watt's native `pprof` commands when you need CPU profile data for flamegraph analysis of a running Watt application.
+
+Platformatic's profiling work spans CPU profiling, heap profiling, and flamegraph analysis. Use CPU profiles to find hot code paths and event-loop bottlenecks, and use heap snapshots/profiles when memory grows over time or objects are not being released.
+
+Install `@platformatic/flame` when you want to turn pprof data into interactive HTML flamegraphs and markdown analysis:
+
+```bash
+npm install -g @platformatic/flame
+```
+
+### 1. Start the Application
+
+Build and start the application in production mode so the profile matches production behavior as closely as possible:
+
+```bash
+wattpm build
+wattpm start
+```
+
+### 2. Identify the Runtime and Application
+
+In another terminal, list the running Watt applications and their application IDs:
+
+```bash
+wattpm ps
+wattpm applications
+```
+
+If only one runtime or application is running, `wattpm pprof` can auto-detect it. Otherwise, pass the runtime ID and application ID explicitly.
+
+### 3. Collect a CPU Profile
+
+Start profiling, generate the workload you want to inspect, then stop profiling:
+
+```bash
+# Profile all applications in the detected runtime
+wattpm pprof start
+
+# Or profile one application explicitly
+wattpm pprof start my-app api-application
+
+# Exercise the slow endpoint or workload here
+
+wattpm pprof stop my-app api-application
+```
+
+`wattpm pprof stop` saves profile data as `pprof-{application}-{timestamp}.pb` files in the current working directory.
+
+### 4. Generate a Flamegraph
+
+Use `@platformatic/flame` to generate an interactive HTML flamegraph and markdown analysis from the pprof file created by Watt:
+
+```bash
+flame generate pprof-api-application-2026-06-15T10-00-00-000Z.pb
+```
+
+To choose the HTML output path:
+
+```bash
+flame generate -o api-cpu-profile.html pprof-api-application-2026-06-15T10-00-00-000Z.pb
+```
+
+For more verbose markdown analysis:
+
+```bash
+flame generate --md-format=detailed pprof-api-application-2026-06-15T10-00-00-000Z.pb
+```
+
+### 5. Profile the Right Workload
+
+- Profile `wattpm start`, not `wattpm dev`, when investigating production latency.
+- Keep the profiling window short and focused on the slow request path.
+- Use `wattpm logs` while profiling to correlate profile timing with application errors or slow operations.
+- Profile a specific application when only one service is slow; profile all applications when the bottleneck is unclear.
+
+### Memory Companion
+
+For memory issues, use `wattpm heap-snapshot` instead of CPU profiling:
+
+```bash
+wattpm heap-snapshot my-app api-application
+```
+
+Heap snapshots are saved as `heap-{application}-{timestamp}.heapsnapshot` files and can be loaded in Chrome DevTools Memory tab.
+
+Watt and `@platformatic/flame` support heap profiling alongside CPU profiling. Treat memory profiling as a separate diagnostic pass: first reproduce the memory growth, then capture heap data near the point where retained objects are visible.
+
+For standalone Node.js scripts outside Watt, `@platformatic/flame` can collect CPU and heap profiles directly and generate flamegraphs when the process exits:
+
+```bash
+flame run server.js
+```
+
+This writes timestamped CPU and heap `.pb` files, interactive `.html` flamegraphs, and `.md` analysis files. CPU and heap files from the same run share a timestamp so they can be correlated.
+
+Use manual mode when you want to start and stop profiling around a specific workload:
+
+```bash
+flame run --manual server.js
+flame toggle
+# Exercise the workload
+flame toggle
+```
+
+For transpiled or bundled applications, pass sourcemap directories so generated stack frames can map back to original sources:
+
+```bash
+flame run --sourcemap-dirs=dist:build server.js
+```
+
+### When to Use Each Profile
+
+| Symptom | Use | Why |
+|---------|-----|-----|
+| High CPU or slow requests | `wattpm pprof start` / `wattpm pprof stop` | Captures where CPU time is spent for flamegraph analysis |
+| Memory growth or suspected leak | `wattpm heap-snapshot` | Captures retained objects for memory inspection |
+| Existing `.pb` profile file | `flame generate profile.pb` | Creates interactive HTML and markdown analysis |
+| Standalone Node.js script | `flame run server.js` | Captures CPU and heap profiles and generates flamegraphs on exit |
+| Unknown bottleneck | CPU profile first, then heap snapshot if memory grows | CPU profiles explain hot paths; heap data explains retention |
+
+### Flamegraph Analysis Notes
+
+- Look for wide frames first; they represent where most sampled CPU time is spent.
+- Focus on application frames before framework or runtime frames unless the runtime frames dominate the profile.
+- Compare profiles before and after a change; single profiles are useful, but deltas make regressions easier to prove.
+- Keep production profiles short and targeted so the captured data corresponds to the workload being investigated.
+
+---
+
 ## Performance Checklist
 
 - [ ] Use `output: 'standalone'` in next.config.mjs
@@ -326,6 +457,7 @@ Metrics include:
 - [ ] Enable distributed caching with Valkey/Redis
 - [ ] Configure health checks with appropriate delays
 - [ ] Enable Prometheus metrics for monitoring
+- [ ] Use `wattpm pprof start` and `wattpm pprof stop` to capture CPU profiles for slow workloads
 - [ ] Use multi-stage Docker builds
 - [ ] Set `NODE_ENV=production`
 
@@ -336,4 +468,6 @@ Metrics include:
 - [Deploy Next.js in Kubernetes with Watt](https://docs.platformatic.dev/docs/guides/deployment/nextjs-in-k8s)
 - [93% Faster Next.js in Kubernetes](https://blog.platformatic.dev/93-faster-nextjs-in-your-kubernetes)
 - [Addressing Overprovisioning via Multiple Workers](https://blog.platformatic.dev/addressing-overprovisioning-performance-issues-in-nodejs-via-multiple-workers)
+- [Next-Gen Flamegraph for Node.js](https://blog.platformatic.dev/introducing-next-gen-flamegraphs-for-nodejs)
+- [Heap Profiling Now in @platformatic/flame & Watt](https://blog.platformatic.dev/announcing-heap-profiling-support-in-platformaticflame-and-watt-runtime)
 - [k8s-watt-performance-demo Repository](https://github.com/platformatic/k8s-watt-performance-demo)
