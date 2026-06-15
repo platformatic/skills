@@ -9,7 +9,7 @@ Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 - **Automatic Framework Detection**: Detects Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
-- **Performance Optimization**: Multi-worker SSR, distributed caching, and Kubernetes tuning
+- **Performance Optimization**: Multi-worker SSR, distributed caching, Kubernetes tuning, CPU profiling with `wattpm pprof`, flamegraph generation with `@platformatic/flame`, and heap snapshots
 - **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks and migrations from KafkaJS or node-rdkafka (separate `kafka` skill)
 - **Scheduled Jobs**: Cron-based task scheduling with retry support
 - **CMS Integration**: Headless CMS webhooks and cache invalidation (Contentful, Sanity, Strapi)
@@ -69,6 +69,9 @@ Any skills-compatible agent will match these skills based on the `description` f
 - *"Migrate from KafkaJS to @platformatic/kafka"*
 - *"Migrate from node-rdkafka to @platformatic/kafka"*
 - *"Create a multi-service enterprise setup"*
+- *"Capture a CPU profile for my Watt app with pprof"*
+- *"Generate a flamegraph with @platformatic/flame"*
+- *"Take a heap snapshot for my Watt app"*
 - *"Add the Vercel Workflow SDK to my Next.js app with @platformatic/world"*
 - *"Wire @platformatic/workflow-fastify into my Fastify server"*
 - *"How do I author a workflow with 'use workflow' and 'use step'?"*

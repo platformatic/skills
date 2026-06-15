@@ -247,11 +247,14 @@ NODE_OPTIONS="--max-old-space-size=4096" npm start
 }
 ```
 
-3. **Check for memory leaks**:
+3. **Capture runtime diagnostics**:
 ```bash
-# Profile with clinic
-npm install -g clinic
-clinic doctor -- node dist/index.js
+# CPU profile for a running application
+wattpm pprof start my-app api-application
+wattpm pprof stop my-app api-application
+
+# Heap snapshot for memory analysis
+wattpm heap-snapshot my-app api-application
 ```
 
 ---
