@@ -6,7 +6,7 @@ Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 
 ## Features
 
-- **Automatic Framework Detection**: Detects Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
+- **Automatic Framework Detection**: Detects Next.js, Nuxt, React Router, TanStack Start, Vite, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
 - **Configuration Generation**: Creates optimized `watt.json` for your framework
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, Kubernetes tuning, CPU profiling with `wattpm pprof`, flamegraph generation with `@platformatic/flame`, and heap snapshots
@@ -113,6 +113,10 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 | Framework | Package | Detection |
 |-----------|---------|-----------|
 | Next.js | `@platformatic/next` | `next.config.{js,ts,mjs}` |
+| Nuxt | `@platformatic/nuxt` | `nuxt.config.{ts,js,mjs}` |
+| React Router | `@platformatic/react-router` | `react-router.config.{ts,js}` |
+| TanStack Start | `@platformatic/tanstack` | `@tanstack/react-start` in dependencies |
+| Vite | `@platformatic/vite` | `vite.config.{js,ts,mjs}` (fallback for Vite apps) |
 | Remix | `@platformatic/remix` | `remix.config.js` |
 | Astro | `@platformatic/astro` | `astro.config.{mjs,ts}` |
 | Express | `@platformatic/node` | `express` in dependencies |
@@ -122,6 +126,8 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 | WordPress | `@platformatic/php` | `wp-config.php` |
 | Laravel | `@platformatic/php` | `artisan` + `composer.json` |
 | PHP | `@platformatic/php` | `composer.json` + `public/index.php` |
+
+Several frameworks build on Vite (React Router, TanStack Start, Remix, Astro) and ship a `vite.config.*`. Detection matches the specific framework first and falls back to `@platformatic/vite` only when no more specific signal is present.
 
 ## Requirements
 

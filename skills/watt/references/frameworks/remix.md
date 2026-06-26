@@ -1,5 +1,7 @@
 # Remix Integration with Platformatic Watt
 
+> Remix v7 was renamed to React Router. For React Router v7+ projects (a `react-router.config.*` file or `@react-router/dev` dependency), use [react-router.md](react-router.md) and `@platformatic/react-router` instead. Use this file for classic Remix v1/v2 projects (`remix.config.js`).
+
 ## Package
 ```
 @platformatic/remix

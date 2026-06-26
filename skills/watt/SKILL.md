@@ -11,7 +11,7 @@ description: |
   - use wattpm CLI commands, manage running applications
   - work with Node.js application servers
   - run PHP, WordPress, or Laravel in Node.js
-  Supports Next.js, Express, Fastify, Koa, Remix, Astro, NestJS, PHP, WordPress, and Laravel.
+  Supports Next.js, Nuxt, React Router, TanStack Start, Vite, Express, Fastify, Koa, Remix, Astro, NestJS, PHP, WordPress, and Laravel.
 argument-hint: "[init|deploy|status] [framework-hint]"
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit
 ---
@@ -72,17 +72,23 @@ Analyze the project to identify the framework. Use this priority order:
 | File | Framework | Package |
 |------|-----------|---------|
 | `next.config.js`, `next.config.ts`, `next.config.mjs` | Next.js | `@platformatic/next` |
+| `nuxt.config.ts`, `nuxt.config.js`, `nuxt.config.mjs` | Nuxt | `@platformatic/nuxt` |
+| `react-router.config.ts`, `react-router.config.js` | React Router | `@platformatic/react-router` |
 | `remix.config.js` | Remix | `@platformatic/remix` |
 | `astro.config.mjs`, `astro.config.ts` | Astro | `@platformatic/astro` |
 | `nest-cli.json` | NestJS | `@platformatic/node` |
 | `wp-config.php` | WordPress | `@platformatic/php` |
 | `artisan` + `composer.json` | Laravel | `@platformatic/php` |
 | `composer.json` + `public/index.php` | PHP | `@platformatic/php` |
+| `vite.config.js`, `vite.config.ts`, `vite.config.mjs` (only if none of the above match) | Vite | `@platformatic/vite` |
+
+> Vite-based frameworks (Next.js excepted) all ship a `vite.config.*`. Match the specific framework first (Nuxt, React Router, Remix, Astro, TanStack); use `@platformatic/vite` only when no more specific signal is present.
 
 **Priority 2 - Dependencies (check package.json):**
 | Dependency | Framework | Package |
 |------------|-----------|---------|
 | `@nestjs/core` | NestJS | `@platformatic/node` |
+| `@tanstack/react-start`, `@tanstack/start` | TanStack Start | `@platformatic/tanstack` |
 | `fastify` | Fastify | `@platformatic/node` |
 | `express` | Express | `@platformatic/node` |
 | `koa` | Koa | `@platformatic/node` |
@@ -92,10 +98,14 @@ If no framework detected, use generic Node.js with `@platformatic/node`.
 
 **For framework-specific configuration, read the appropriate reference file:**
 - [references/frameworks/nextjs.md](references/frameworks/nextjs.md) for Next.js
+- [references/frameworks/nuxt.md](references/frameworks/nuxt.md) for Nuxt
+- [references/frameworks/react-router.md](references/frameworks/react-router.md) for React Router (formerly Remix)
+- [references/frameworks/tanstack.md](references/frameworks/tanstack.md) for TanStack Start
+- [references/frameworks/vite.md](references/frameworks/vite.md) for plain Vite (SPA or custom SSR)
 - [references/frameworks/express.md](references/frameworks/express.md) for Express
 - [references/frameworks/fastify.md](references/frameworks/fastify.md) for Fastify
 - [references/frameworks/koa.md](references/frameworks/koa.md) for Koa
-- [references/frameworks/remix.md](references/frameworks/remix.md) for Remix
+- [references/frameworks/remix.md](references/frameworks/remix.md) for Remix (classic v1/v2; use React Router for v7+)
 - [references/frameworks/astro.md](references/frameworks/astro.md) for Astro
 - [references/frameworks/nestjs.md](references/frameworks/nestjs.md) for NestJS
 - [references/frameworks/php.md](references/frameworks/php.md) for PHP, WordPress, and Laravel
@@ -107,7 +117,7 @@ Create `watt.json` based on detected framework. Use the schema URL:
 https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json
 ```
 
-Where `{package}` is: `next`, `remix`, `astro`, `node`, or `php`.
+Where `{package}` is: `next`, `nuxt`, `react-router`, `tanstack`, `vite`, `remix`, `astro`, `node`, or `php`.
 
 **Runtime placement rule:**
 - For single-config application files (e.g. `@platformatic/node`, `@platformatic/next`, etc.), put runtime settings under `runtime`.
