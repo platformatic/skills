@@ -33,7 +33,7 @@ The plugin exposes three component types, each a Markdown file with YAML frontma
 ### Skills (`skills/watt/`)
 - **`SKILL.md`** — Main entrypoint. Contains a command router that maps user input (e.g. `init`, `deploy docker`) to inline workflows. Workflows read reference files on demand — they never bulk-load all references.
 - **`references/`** — Knowledge base loaded lazily by workflows:
-  - `frameworks/` — Per-framework watt.json configs (nextjs, express, fastify, koa, remix, astro, nestjs, php)
+  - `frameworks/` — Per-framework watt.json configs (nextjs, nuxt, react-router, tanstack, vite, express, fastify, koa, remix, astro, nestjs, php)
   - `deployment/` — Docker, Kubernetes, cloud deployment guides
   - Topic files: enterprise, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting, wattpm-cli
 
@@ -94,7 +94,7 @@ Read-only agents should only declare: `allowed-tools: Read, Glob, Grep`
 These facts must stay accurate across all documentation files:
 
 - **Node.js requirement**: v22.19.0+
-- **watt.json schema URL pattern**: `https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json` (packages: `next`, `node`, `remix`, `astro`, `php`)
+- **watt.json schema URL pattern**: `https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json` (packages: `next`, `nuxt`, `react-router`, `tanstack`, `vite`, `node`, `remix`, `astro`, `php`)
 - **Environment variables in watt.json**: `{VAR_NAME}` (curly braces, no dollar sign)
 - **Internal service URLs in app code**: `http://{service-id}.plt.local`
 - **Composer service origins**: `internal://{service-id}`

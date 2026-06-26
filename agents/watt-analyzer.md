@@ -18,21 +18,30 @@ Search for framework indicators using this priority:
 
 **Priority 1 - Config Files (most reliable):**
 ```
-next.config.{js,ts,mjs}     → Next.js
-remix.config.js             → Remix
-astro.config.{mjs,ts}       → Astro
-nest-cli.json               → NestJS
+next.config.{js,ts,mjs}     → Next.js (@platformatic/next)
+nuxt.config.{ts,js,mjs}     → Nuxt (@platformatic/nuxt)
+react-router.config.{ts,js} → React Router (@platformatic/react-router)
+remix.config.js             → Remix (@platformatic/remix)
+astro.config.{mjs,ts}       → Astro (@platformatic/astro)
+nest-cli.json               → NestJS (@platformatic/node)
 wp-config.php               → WordPress (use @platformatic/php)
 artisan + composer.json     → Laravel (use @platformatic/php)
 composer.json + public/index.php → PHP (use @platformatic/php)
+vite.config.{js,ts,mjs}     → Vite (@platformatic/vite) ONLY if no framework above matches
 ```
+
+Vite-based frameworks (React Router, TanStack Start, Remix, Astro) also ship a `vite.config.*`. Match the specific framework first; treat `@platformatic/vite` as the fallback for plain Vite apps.
 
 **Priority 2 - Dependencies (package.json):**
 ```
-@nestjs/core                → NestJS
-fastify                     → Fastify
-express                     → Express
-koa                         → Koa
+@nestjs/core                → NestJS (@platformatic/node)
+@tanstack/react-start       → TanStack Start (@platformatic/tanstack)
+@tanstack/start             → TanStack Start, older (@platformatic/tanstack)
+@react-router/dev           → React Router (@platformatic/react-router)
+nuxt                        → Nuxt (@platformatic/nuxt)
+fastify                     → Fastify (@platformatic/node)
+express                     → Express (@platformatic/node)
+koa                         → Koa (@platformatic/node)
 hono                        → Hono (use @platformatic/node)
 ```
 
@@ -40,7 +49,7 @@ hono                        → Hono (use @platformatic/node)
 ```
 app/ with page.tsx          → Next.js App Router
 pages/ with _app.tsx        → Next.js Pages Router
-src/routes/                 → Remix or SvelteKit
+src/routes/                 → Remix, React Router, or SvelteKit
 ```
 
 ### 2. TypeScript Detection
