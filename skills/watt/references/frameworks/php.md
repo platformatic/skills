@@ -1,6 +1,6 @@
 # PHP Integration with Platformatic Watt
 
-Watt can run PHP applications (Laravel, WordPress, and custom PHP) directly inside the Node.js runtime using the `@platformatic/php` stackable.
+Watt can run PHP applications (Laravel, WordPress, and custom PHP) directly inside the Node.js runtime using the `@platformatic/php` capability.
 
 ## Package
 ```
@@ -9,7 +9,7 @@ Watt can run PHP applications (Laravel, WordPress, and custom PHP) directly insi
 
 ## How It Works
 
-The PHP stackable uses `@platformatic/php-node`, a Rust-based native module that embeds a multi-threaded PHP runtime directly inside Node.js. PHP runs in the Node worker pool, shares cache, auth, and rate-limits with adjacent JS services.
+The PHP capability uses `@platformatic/php-node`, a Rust-based native module that embeds a multi-threaded PHP runtime directly inside Node.js. PHP runs in the Node worker pool, shares cache, auth, and rate-limits with adjacent JS services.
 
 ## Detection
 
@@ -318,7 +318,7 @@ Verify the `rewriter` rules are correctly configured to route through `index.php
 
 ## Resources
 
-- [Platformatic PHP Stackable](https://github.com/platformatic/php)
+- [Platformatic PHP Capability](https://github.com/platformatic/php)
 - [php-node Repository](https://github.com/platformatic/php-node)
 - [WordPress + Next.js Example](https://github.com/platformatic/watt-next-wordpress)
 - [Laravel Example](https://github.com/platformatic/watt-next-laravel)
