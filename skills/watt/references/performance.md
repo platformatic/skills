@@ -1,473 +1,171 @@
-# Performance Optimization for Platformatic Watt
+# Performance and profiling in Watt 4
 
-## How Watt Achieves Better Performance
+Measure production-like traffic before changing workers, CPU limits, caching, or builds.
+Linux `SO_REUSEPORT` can distribute connections across managed workers without a
+master-process load-balancing path. Its availability and behavior are OS/listener-specific;
+do not promise the same behavior on macOS/Windows or custom servers.
 
-Watt leverages **SO_REUSEPORT**, a Linux kernel feature that distributes connections across multiple Node.js processes with zero coordination overhead. This eliminates the ~30% performance tax that PM2 and the cluster module impose through IPC-based load balancing.
+Historical benchmark results such as “93% faster” describe particular workloads, not
+a guarantee for every app or a universal ranking of Node, Bun, and Deno. Retain benchmark
+links as context and compare the user's own p50/p95/p99, throughput, CPU, and memory.
 
-Instead of having a master process coordinate workers, Watt lets the Linux kernel handle load distribution directly.
+## Workers and resources
 
-### Benchmark Results
+Workers belong to runtime application entries:
 
-Tests show three distinct performance tiers:
-- **Watt & Deno**: ~11-14ms average latency (fastest)
-- **Node.js**: ~20ms average latency
-- **Bun**: ~246ms average latency (highest)
+```js
+import { createWattConfig } from 'wattpm'
 
-Watt achieves up to **93% latency improvement** compared to traditional approaches.
-
----
-
-## Worker Configuration
-
-### Setting Workers
-
-Configure workers via environment variable or watt.json:
-
-```bash
-# Environment variable
-PLT_NEXT_WORKERS=4
-```
-
-```json
-// watt.json
-{
-  "runtime": {
-    "workers": {
-      "static": "{PLT_NEXT_WORKERS}"
+export default createWattConfig({
+  applications: [
+    {
+      id: 'storefront',
+      path: './applications/storefront',
+      workers: Number(process.env.PLT_NEXT_WORKERS || 1)
     }
+  ]
+})
+```
+
+For a single capability needing runtime options, use the singular `application` wrapper
+shown in [Next.js](frameworks/nextjs.md). Do not use legacy root directory-keyed worker maps.
+Check supported static/dynamic worker options and fixed-port sharing/`portAssignment`.
+Development may intentionally use only one worker.
+
+A starting experiment can allocate one CPU core per CPU-bound worker:
+
+| Workers | Example CPU budget |
+| --- | --- |
+| 1 | 1000m |
+| 2 | 2000m |
+| 4 | 4000m |
+
+This is **not a required formula**. Include runtime overhead, other applications,
+DB pools, cache clients, and per-worker heap. Check throttling and event-loop utilization.
+For four CPU-bound workers, a test pod might request 4000m/1Gi and allow 2Gi, but tune
+from actual traffic instead of copying limits blindly. Coordinate pod replicas and workers.
+
+## Next.js build and caching
+
+Standalone output is useful for selected deployments, not mandatory. When using it,
+set both Next `output: 'standalone'` and capability `next.standalone: true`; keep Watt
+runtime/capability dependencies and startup. A container that starts only `server.js`
+bypasses Watt orchestration. See [Docker](deployment/docker.md).
+
+The Next capability supports Valkey/Redis cache configuration:
+
+```js
+import { createNextConfig } from '@platformatic/next'
+
+export default createNextConfig({
+  server: { port: Number(process.env.PORT || 3000) },
+  cache: {
+    adapter: 'valkey',
+    url: process.env.PLT_VALKEY_HOST,
+    prefix: 'storefront'
   }
-}
+})
 ```
 
-### CPU Scaling Rule
+Require a real URL when enabled. Check adapter/version, namespace, TTL, and cache mode
+(ISR vs Cache Components). Time-based ISR (`export const revalidate = 10`) and tag
+revalidation depend on installed Next.js APIs. Verify invalidation across workers and
+replicas; do not assume local cache propagation. Use an authenticated endpoint as in
+[CMS integration](cms-integration.md).
 
-**Critical**: CPU limits must scale proportionally with workers.
+## Deployment monitoring
 
-| Workers | CPU Request | CPU Limit |
-|---------|-------------|-----------|
-| 1 | 1000m | 1000m |
-| 2 | 2000m | 2000m |
-| 4 | 4000m | 4000m |
+Use the actual public listener, implemented readiness/liveness routes, and a separately
+configured private metrics listener. Metrics are not automatically served on 9090.
+Inspect real metric names, worker labels, and caching metrics rather than assuming them.
+See [Kubernetes](deployment/kubernetes.md) and [observability](observability.md).
 
-Formula: `CPU = workers × 1000m`
+## CPU profiling with pprof
 
----
+With permission, build/start in production mode, then identify IDs in another terminal:
 
-## Next.js Specific Optimizations
-
-### 1. Standalone Output Mode
-
-Use Next.js standalone output for smaller Docker images:
-
-```javascript
-// next.config.mjs
-export default {
-  output: 'standalone',
-};
-```
-
-### 2. Multithreaded SSR
-
-Watt provides multithreaded Server-Side Rendering configured to handle multiple concurrent SSR requests efficiently.
-
-```json
-{
-  "runtime": {
-    "workers": {
-      "static": "{PLT_NEXT_WORKERS}"
-    }
-  }
-}
-```
-
-### 3. Distributed Caching with Valkey/Redis
-
-Share cache across pod replicas to reduce API load:
-
-```json
-{
-  "cache": {
-    "adapter": "valkey",
-    "url": "{PLT_VALKEY_HOST}"
-  }
-}
-```
-
-Benefits:
-- Shared ISR cache across all replicas
-- Reduced database/API load
-- Consistent cache state
-
-### 4. Incremental Static Regeneration (ISR)
-
-Configure time-based revalidation:
-
-```typescript
-// In your page
-export const revalidate = 10; // Revalidate every 10 seconds
-```
-
----
-
-## Kubernetes Resource Configuration
-
-### Recommended Pod Resources
-
-```yaml
-resources:
-  requests:
-    cpu: "1000m"      # Guaranteed minimum
-    memory: "256Mi"
-  limits:
-    cpu: "1000m"      # Maximum allowed
-    memory: "1024Mi"
-```
-
-### Scaling with Workers
-
-For 4 workers:
-```yaml
-resources:
-  requests:
-    cpu: "4000m"
-    memory: "1024Mi"
-  limits:
-    cpu: "4000m"
-    memory: "2048Mi"
-```
-
-### Health Checks
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 3000
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 3000
-  initialDelaySeconds: 10
-  periodSeconds: 5
-```
-
----
-
-## Optimized watt.json for Production
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/next/3.0.0.json",
-  "application": {
-    "basePath": "/",
-    "commands": {
-      "development": "next dev",
-      "build": "next build",
-      "production": "next start"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "0.0.0.0",
-      "port": "{PORT}"
-    },
-    "workers": {
-      "static": "{PLT_NEXT_WORKERS}"
-    }
-  },
-  "cache": {
-    "adapter": "valkey",
-    "url": "{PLT_VALKEY_HOST}"
-  }
-}
-```
-
----
-
-## Optimized Dockerfile (Standalone Mode)
-
-```dockerfile
-# Build stage
-FROM node:22-alpine AS builder
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-RUN npm run build
-
-# Production stage
-FROM node:22-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV PLT_SERVER_HOSTNAME=0.0.0.0
-
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-# Copy standalone output
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
-CMD ["node", "server.js"]
-```
-
----
-
-## Kubernetes Deployment for Performance
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nextjs-watt
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nextjs-watt
-  template:
-    metadata:
-      labels:
-        app: nextjs-watt
-    spec:
-      containers:
-        - name: app
-          image: your-registry/nextjs-watt:latest
-          ports:
-            - containerPort: 3000
-            - containerPort: 9090  # Prometheus metrics
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: PORT
-              value: "3000"
-            - name: PLT_SERVER_HOSTNAME
-              value: "0.0.0.0"
-            - name: PLT_NEXT_WORKERS
-              value: "2"
-            - name: PLT_VALKEY_HOST
-              value: "valkey://cache:6379"
-          resources:
-            requests:
-              cpu: "2000m"    # 2 workers × 1000m
-              memory: "512Mi"
-            limits:
-              cpu: "2000m"
-              memory: "1024Mi"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 10
-            periodSeconds: 5
-```
-
----
-
-## Prometheus Monitoring
-
-Watt automatically exposes metrics on port 9090:
-
-```yaml
-# ServiceMonitor for Prometheus
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: nextjs-watt-monitor
-spec:
-  selector:
-    matchLabels:
-      app: nextjs-watt
-  endpoints:
-    - port: metrics
-      interval: 15s
-      path: /metrics
-```
-
-Metrics include:
-- Node.js runtime metrics
-- HTTP request latency/throughput
-- Worker utilization
-- Cache hit rates
-
----
-
-## CPU Profiling with pprof
-
-Use Watt's native `pprof` commands when you need CPU profile data for flamegraph analysis of a running Watt application.
-
-Platformatic's profiling work spans CPU profiling, heap profiling, and flamegraph analysis. Use CPU profiles to find hot code paths and event-loop bottlenecks, and use heap snapshots/profiles when memory grows over time or objects are not being released.
-
-Install `@platformatic/flame` when you want to turn pprof data into interactive HTML flamegraphs and markdown analysis:
-
-```bash
-npm install -g @platformatic/flame
-```
-
-### 1. Start the Application
-
-Build and start the application in production mode so the profile matches production behavior as closely as possible:
-
-```bash
+```sh
 wattpm build
 wattpm start
 ```
 
-### 2. Identify the Runtime and Application
-
-In another terminal, list the running Watt applications and their application IDs:
-
-```bash
+```sh
 wattpm ps
-wattpm applications
+wattpm applications my-app
+wattpm pprof start my-app api
+# Exercise the slow workload for a short, agreed window.
+wattpm pprof stop my-app api
 ```
 
-If only one runtime or application is running, `wattpm pprof` can auto-detect it. Otherwise, pass the runtime ID and application ID explicitly.
+Inspect installed CLI syntax and use actual IDs. Profiling can target a selected app
+or all applications when supported; stop the same profiling session after collection.
+`stop` saves `.pb` files such as `pprof-{application}-{timestamp}.pb` in the working directory.
+Use exact returned paths; do not invent a filename or a worker identifier.
 
-### 3. Collect a CPU Profile
+## Flamegraphs and analysis
 
-Start profiling, generate the workload you want to inspect, then stop profiling:
+Install `@platformatic/flame` only with authorization (preserve local tooling choices;
+global installation is not automatic). Given a captured file:
 
-```bash
-# Profile all applications in the detected runtime
-wattpm pprof start
-
-# Or profile one application explicitly
-wattpm pprof start my-app api-application
-
-# Exercise the slow endpoint or workload here
-
-wattpm pprof stop my-app api-application
+```sh
+flame generate profile.pb
+flame generate -o api-cpu-profile.html profile.pb
+flame generate --md-format=detailed profile.pb
 ```
 
-`wattpm pprof stop` saves profile data as `pprof-{application}-{timestamp}.pb` files in the current working directory.
+Check installed help for supported flags. Inspect wide frames/hot paths, distinguish
+application vs framework overhead, and compare before/after profiles under the same load.
+Correlate with logs without disclosing secrets. Generated profiles/HTML/Markdown must
+remain out of source control unless explicitly intended as sanitized artifacts.
 
-### 4. Generate a Flamegraph
+## Memory diagnostics
 
-Use `@platformatic/flame` to generate an interactive HTML flamegraph and markdown analysis from the pprof file created by Watt:
-
-```bash
-flame generate pprof-api-application-2026-06-15T10-00-00-000Z.pb
+```sh
+wattpm heap-snapshot my-app api
 ```
 
-To choose the HTML output path:
+Heap snapshots can pause applications, be expensive, and expose credentials/personal data.
+Request permission and capture after reproducing retention. Load the returned `.heapsnapshot`
+in DevTools Memory; use actual returned paths. CPU `.pb` profiles and heap snapshots
+answer different questions and are not interchangeable.
 
-```bash
-flame generate -o api-cpu-profile.html pprof-api-application-2026-06-15T10-00-00-000Z.pb
-```
+## Standalone scripts outside Watt
 
-For more verbose markdown analysis:
+Use Flame's own profiling only for standalone processes, not as a replacement for Watt
+worker profiling:
 
-```bash
-flame generate --md-format=detailed pprof-api-application-2026-06-15T10-00-00-000Z.pb
-```
-
-### 5. Profile the Right Workload
-
-- Profile `wattpm start`, not `wattpm dev`, when investigating production latency.
-- Keep the profiling window short and focused on the slow request path.
-- Use `wattpm logs` while profiling to correlate profile timing with application errors or slow operations.
-- Profile a specific application when only one service is slow; profile all applications when the bottleneck is unclear.
-
-### Memory Companion
-
-For memory issues, use `wattpm heap-snapshot` instead of CPU profiling:
-
-```bash
-wattpm heap-snapshot my-app api-application
-```
-
-Heap snapshots are saved as `heap-{application}-{timestamp}.heapsnapshot` files and can be loaded in Chrome DevTools Memory tab.
-
-Watt and `@platformatic/flame` support heap profiling alongside CPU profiling. Treat memory profiling as a separate diagnostic pass: first reproduce the memory growth, then capture heap data near the point where retained objects are visible.
-
-For standalone Node.js scripts outside Watt, `@platformatic/flame` can collect CPU and heap profiles directly and generate flamegraphs when the process exits:
-
-```bash
+```sh
 flame run server.js
-```
-
-This writes timestamped CPU and heap `.pb` files, interactive `.html` flamegraphs, and `.md` analysis files. CPU and heap files from the same run share a timestamp so they can be correlated.
-
-Use manual mode when you want to start and stop profiling around a specific workload:
-
-```bash
 flame run --manual server.js
 flame toggle
-# Exercise the workload
+# Exercise the target workload, then toggle again.
 flame toggle
-```
-
-For transpiled or bundled applications, pass sourcemap directories so generated stack frames can map back to original sources:
-
-```bash
 flame run --sourcemap-dirs=dist:build server.js
 ```
 
-### When to Use Each Profile
+Inspect help for the installed version's CPU/heap output and manual-session selection.
+Source maps must correspond to the build being profiled. Keep collected files private.
 
-| Symptom | Use | Why |
-|---------|-----|-----|
-| High CPU or slow requests | `wattpm pprof start` / `wattpm pprof stop` | Captures where CPU time is spent for flamegraph analysis |
-| Memory growth or suspected leak | `wattpm heap-snapshot` | Captures retained objects for memory inspection |
-| Existing `.pb` profile file | `flame generate profile.pb` | Creates interactive HTML and markdown analysis |
-| Standalone Node.js script | `flame run server.js` | Captures CPU and heap profiles and generates flamegraphs on exit |
-| Unknown bottleneck | CPU profile first, then heap snapshot if memory grows | CPU profiles explain hot paths; heap data explains retention |
+| Symptom | Diagnostic |
+| --- | --- |
+| Slow CPU-bound endpoint | Watt pprof + flamegraph |
+| Growing memory | Heap snapshot/appropriate heap profile after reproduction |
+| Existing `.pb` file | Flame generate |
+| Standalone Node process | Flame run |
+| Unknown bottleneck | Measure load/latency, CPU profile, then memory if retention grows |
 
-### Flamegraph Analysis Notes
+## Checklist
 
-- Look for wide frames first; they represent where most sampled CPU time is spent.
-- Focus on application frames before framework or runtime frames unless the runtime frames dominate the profile.
-- Compare profiles before and after a change; single profiles are useful, but deltas make regressions easier to prove.
-- Keep production profiles short and targeted so the captured data corresponds to the workload being investigated.
-
----
-
-## Performance Checklist
-
-- [ ] Use `output: 'standalone'` in next.config.mjs
-- [ ] Configure `PLT_NEXT_WORKERS` based on available CPU
-- [ ] Set CPU limits = workers × 1000m
-- [ ] Enable distributed caching with Valkey/Redis
-- [ ] Configure health checks with appropriate delays
-- [ ] Enable Prometheus metrics for monitoring
-- [ ] Use `wattpm pprof start` and `wattpm pprof stop` to capture CPU profiles for slow workloads
-- [ ] Use multi-stage Docker builds
-- [ ] Set `NODE_ENV=production`
-
----
+- Agree on profiling window/traffic and stop sessions/processes created for the check.
+- Build before production start; retain source maps and complete framework output.
+- Size workers/CPU/memory from measurements, checking platform port-sharing support.
+- Verify shared cache and invalidation, implemented probes, and protected metrics.
+- Report actual checks/results and unverified deployment assumptions.
 
 ## Resources
 
-- [Deploy Next.js in Kubernetes with Watt](https://docs.platformatic.dev/docs/guides/deployment/nextjs-in-k8s)
-- [93% Faster Next.js in Kubernetes](https://blog.platformatic.dev/93-faster-nextjs-in-your-kubernetes)
-- [Addressing Overprovisioning via Multiple Workers](https://blog.platformatic.dev/addressing-overprovisioning-performance-issues-in-nodejs-via-multiple-workers)
-- [Next-Gen Flamegraph for Node.js](https://blog.platformatic.dev/introducing-next-gen-flamegraphs-for-nodejs)
-- [Heap Profiling Now in @platformatic/flame & Watt](https://blog.platformatic.dev/announcing-heap-profiling-support-in-platformaticflame-and-watt-runtime)
-- [k8s-watt-performance-demo Repository](https://github.com/platformatic/k8s-watt-performance-demo)
+- [Next.js Kubernetes deployment](https://docs.platformatic.dev/docs/guides/deployment/nextjs-in-k8s)
+- [Historical Next.js benchmark](https://blog.platformatic.dev/93-faster-nextjs-in-your-kubernetes)
+- [Worker provisioning discussion](https://blog.platformatic.dev/addressing-overprovisioning-performance-issues-in-nodejs-via-multiple-workers)
+- [Flamegraph tooling](https://blog.platformatic.dev/introducing-next-gen-flamegraphs-for-nodejs)
+- [Heap profiling](https://blog.platformatic.dev/announcing-heap-profiling-support-in-platformaticflame-and-watt-runtime)

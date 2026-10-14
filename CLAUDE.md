@@ -6,11 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Repository**: `platformatic/skills` (https://github.com/platformatic/skills)
 
-This is an **Agent Skill** following the [Agent Skills open standard](https://agentskills.io/) (not a Node.js application). There is no package.json, no build system, no source code, and no tests. The entire project is structured Markdown files that agents read and execute as instructions, workflows, and reference documentation.
+This is an **Agent Skill** following the [Agent Skills open standard](https://agentskills.io/),
+not a Node.js application. Skills are Markdown instructions/reference documentation;
+`scripts/prepare-watt-context.mjs` prepares immutable reconciliation snapshots. There is
+no package.json or application build/test system.
 
 The `skills/` directory is portable across any skills-compatible agent (Claude Code, Cursor, GitHub Copilot, Gemini CLI, etc.). The `agents/`, `commands/`, and `.claude-plugin/` directories are Claude Code-specific extensions that add slash commands and sub-agents.
 
-The skill gives agents the knowledge to help users integrate [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) into Node.js and PHP projects — framework detection, `watt.json` generation, dependency installation, deployment configs, and more.
+The Watt skill covers Watt 4.0.0 direct scaffolding, executable configuration, integration,
+Watt 3 migration, services/gateways/databases, and operations. External PHP compatibility
+must be checked before integration. Installation, execution, migration, and deployment
+require authorization; read-only status/analyzer inspection must not download packages.
 
 ## Testing
 
@@ -31,9 +37,11 @@ claude --plugin-dir /path/to/watt-skill
 The plugin exposes three component types, each a Markdown file with YAML frontmatter:
 
 ### Skills (`skills/watt/`)
-- **`SKILL.md`** — Main entrypoint. Contains a command router that maps user input (e.g. `init`, `deploy docker`) to inline workflows. Workflows read reference files on demand — they never bulk-load all references.
+- **`SKILL.md`** — Main contract/router for integration, scaffolding, migration, and operations.
+  Workflows read only relevant references on demand, never bulk-load them.
 - **`references/`** — Knowledge base loaded lazily by workflows:
-  - `frameworks/` — Per-framework watt.json configs (nextjs, nuxt, react-router, tanstack, vite, express, fastify, koa, remix, astro, nestjs, php)
+  - Core guides: scaffolding, frameworks index, services, integration, migration-v4, operations
+  - `frameworks/` — Per-framework Watt 4 configs (nextjs, nuxt, nitro, react-router, tanstack, vite, express, fastify, koa, remix, astro, nestjs) and external PHP compatibility
   - `deployment/` — Docker, Kubernetes, cloud deployment guides
   - Topic files: enterprise, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting, wattpm-cli
 
@@ -76,31 +84,42 @@ Read-only agents should only declare: `allowed-tools: Read, Glob, Grep`
 
 ### Adding a New Framework
 
-1. Create `skills/watt/references/frameworks/{framework}.md` with: package name, detection method, watt.json config, installation steps, key considerations, common issues
-2. Add detection entry to `SKILL.md` Priority 1 (config files) or Priority 2 (dependencies) tables
-3. Add a Read instruction for the new reference file in `SKILL.md`'s Integration Workflow
+1. Create `skills/watt/references/frameworks/{framework}.md` with package, signals,
+   verified Watt 4 helper/config, authorized installation, lifecycle, and compatibility details
+2. Add combined configuration/dependency detection to `references/frameworks.md`;
+   specific frameworks take precedence over shared Vite/Nitro infrastructure
+3. Link the detailed guide from the framework index
 4. Update the supported frameworks table in `README.md`
 5. Update detection priorities in `agents/watt-analyzer.md`
 
 ### Adding a New Workflow
 
 1. Add a routing entry to the Command Router table in `SKILL.md`
-2. Add a new `## Workflow Name` section to `SKILL.md` with step-by-step instructions
-3. For large workflows, create a reference file in `skills/watt/references/` and Read it from `SKILL.md`
+2. Keep the shared contract in `SKILL.md` and detailed steps in a focused reference
+3. Link large workflows from the router and relevant reference indexes
 4. Update `README.md` with the new command
 
 ## Key Watt Facts
 
 These facts must stay accurate across all documentation files:
 
-- **Node.js requirement**: v22.19.0+
-- **watt.json schema URL pattern**: `https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json` (packages: `next`, `nuxt`, `react-router`, `tanstack`, `vite`, `node`, `remix`, `astro`, `php`)
-- **Environment variables in watt.json**: `{VAR_NAME}` (curly braces, no dollar sign)
+- **Watt 4.0.0 Node.js requirement**: v24.20.0+, including CI/production
+- **Configuration**: one `watt.config.{ts,mts,cts,js,mjs,cjs}` per directory;
+  module system follows extension/package type. No competing legacy configuration
+- **Helpers/plain objects**: inspect installed exports/schema; plain objects identify
+  `module` and use the exact installed version when stamping `$schema`
+- **Environment**: explicit `process.env` expressions/conversions, not legacy placeholders
 - **Internal service URLs in app code**: `http://{service-id}.plt.local`
-- **Composer service origins**: `internal://{service-id}`
-- **Worker naming**: directory name only (e.g. `"storefront"`, not `"web/storefront"`)
+- **Gateway**: `@platformatic/gateway`, `gateway.applications`, internal application IDs;
+  do not require Composer's legacy origin syntax
+- **Listeners/workers**: capability-owned `server`, no runtime `entrypoint`/root `server`;
+  workers/dependencies belong to orchestration application entries, IDs need not match paths
 - **Standard scripts**: `wattpm dev`, `wattpm build`, `wattpm start`
-- **Install**: `npm install wattpm` (plus framework-specific `@platformatic/*` package)
+- **Install**: compatible Watt 4 `wattpm` and capability with the existing package manager,
+  only with permission. No removed scaffolding/import commands
+- **Utilities**: `wattpm-utils install`, `update`, `resolve`, `migrate`; no CLI `config`/`patch-config`
+- **Tracing/cleanup**: `tracing`, `@platformatic/tracing`, typed globals, `registerCloseCallback()`
+- **Compatibility**: preserve valid legacy framework details, but do not assume external PHP/addon support
 
 ## Git Conventions
 

@@ -1,333 +1,136 @@
-# Next.js Integration with Platformatic Watt
+# Next.js with Watt 4
 
-## Package
-```
-@platformatic/next
-```
+## Detection and installation
 
-## Detection Files
-- `next.config.js`
-- `next.config.ts`
-- `next.config.mjs`
+Detect `next.config.{js,ts,mjs}` and the `next` dependency. With authorization, install
+compatible Watt 4 `wattpm` and `@platformatic/next` using the existing package manager.
+Preserve App Router/Pages Router, React version, routes, middleware, image settings,
+and existing adapter/build choices.
 
-## watt.json Configuration
+## Configuration
 
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/next/3.0.0.json",
-  "application": {
-    "basePath": "/",
-    "commands": {
-      "development": "next dev",
-      "build": "next build",
-      "production": "next start"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
+In an ESM project, `watt.config.js`:
+
+```js
+import { createNextConfig } from '@platformatic/next'
+
+export default createNextConfig({
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-}
+})
 ```
 
-## Installation
+Use `.ts` in a TypeScript ESM project, or `.mjs`/`.mts` to force ESM without changing
+the package type. The capability handles default lifecycle commands; preserve original
+scripts when introducing `wattpm dev`, `build`, and `start`.
 
-```bash
-npm install wattpm
-npm install @platformatic/next
-```
+For a prefix, inspect `application.basePath`, Next.js `basePath`, and Gateway rewriting
+together. Do not assume setting one changes all asset paths. Multi-zone roots declare
+`applications` with unique IDs and paths, not `services`.
 
-## Key Considerations
+### Workers
 
-### App Router vs Pages Router
-Watt supports both routing paradigms. No special configuration needed.
+Workers belong to the runtime application entry. A single app with runtime options:
 
-### Base Path
-Set `application.basePath` if your app is not served from the root:
-```json
-{
-  "application": {
-    "basePath": "/my-app"
+```js
+import { createWattConfig } from 'wattpm'
+import { createNextConfig } from '@platformatic/next'
+
+export default createWattConfig({
+  logger: { level: process.env.LOG_LEVEL || 'info' },
+  application: {
+    workers: Number(process.env.PLT_NEXT_WORKERS || 1),
+    config: createNextConfig({
+      server: { port: Number(process.env.PORT || 3000) }
+    })
   }
-}
+})
 ```
 
-### Workers (Production Scaling)
-For production, configure workers via environment variable:
-```
-PLT_NEXT_WORKERS=4
-```
+In a workspace use `{ id: 'storefront', path: './apps/storefront', workers: 4 }`.
+Do not use a root map keyed by directory path. Size CPU/memory from measurements;
+workers do not guarantee proportional throughput. See [performance](../performance.md).
 
-**Standalone Next.js app** - add to watt.json:
-```json
-{
-  "runtime": {
-    "workers": "{PLT_NEXT_WORKERS}"
-  }
-}
-```
+### Output and deployment
 
-**Multi-service setup** - use the service directory name as key in root watt.json:
-```json
-{
-  "workers": {
-    "storefront": "{PLT_STOREFRONT_WORKERS}",
-    "admin": "{PLT_ADMIN_WORKERS}"
-  }
-}
-```
+Run `wattpm build` before `start`. Use `output: 'standalone'` only when that deployment
+needs it, and set capability `next: { standalone: true }` for Watt's standalone path.
+Include the Watt runtime and capability, not just Next's `server.js`; see
+[Docker](../deployment/docker.md). Static `output: 'export'` is a different hosting path,
+not this SSR integration. Check supported Next.js/Turbopack versions instead of universally
+disabling Turbopack. Native config type stripping does not compile TSX or replace Next's build.
 
-**Key point:** Use the service directory name (e.g., `"storefront"`), not the full path.
+## Environment and images
 
-### Output Mode (Important)
+Keep Next's `.env.local`, `.env.production`, and `NEXT_PUBLIC_*` conventions. `HOST`,
+`PORT`, and `LOG_LEVEL` in these examples are explicitly read by config, not automatically
+injected listener settings. Preserve existing variable names when integrating.
 
-**Recommended:** Use `output: 'standalone'` for optimal Watt deployment:
-```javascript
-// next.config.mjs
-export default {
-  output: 'standalone',
-};
-```
+For external images, retain or extend `images.remotePatterns` in `next.config.*`:
 
-**Not supported:** `output: 'export'` (static export) - Watt requires server-side rendering.
-
-### Turbopack
-Currently, disable Turbopack and use standard webpack build for compatibility.
-
-## Quick Import
-
-For existing Next.js projects, use the import utility:
-```bash
-npx wattpm-utils import
-```
-
-This auto-generates `watt.json` and installs dependencies.
-
-## Environment Variables
-
-Next.js environment variables work as expected:
-- `.env.local` for local development
-- `.env.production` for production
-- `NEXT_PUBLIC_*` for client-side variables
-
-Watt adds these:
-- `PLT_SERVER_HOSTNAME` - Server bind address
-- `PLT_SERVER_LOGGER_LEVEL` - Log level (info, debug, warn, error)
-- `PORT` - Server port
-
-## Common Issues
-
-### Port Conflicts
-Ensure `PORT` env var doesn't conflict with Next.js default 3000. Watt will try the next available port if occupied.
-
-### API Routes
-Next.js API routes (`/api/*`) work normally within Watt.
-
-### Middleware
-Next.js middleware is fully supported.
-
-### Image Optimization
-The built-in Next.js image optimizer works with Watt.
-
-For external image sources (CDN, CMS like Contentful):
-```javascript
-// next.config.mjs
+```js
 export default {
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.ctfassets.net',  // Contentful
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.example.com',
-      },
-    ],
-  },
-};
-```
-
-## Multi-Zone Setup
-
-For micro-frontends, configure multiple Next.js apps in a monorepo:
-```json
-{
-  "services": [
-    { "path": "./apps/main", "id": "main" },
-    { "path": "./apps/admin", "id": "admin" }
-  ]
+      { protocol: 'https', hostname: 'images.ctfassets.net' },
+      { protocol: 'https', hostname: 'cdn.example.com' }
+    ]
+  }
 }
 ```
 
-## TypeScript
+## ISR, cache tags, and CMS
 
-Next.js TypeScript projects work out of the box. No additional configuration needed - Watt uses Node.js native type stripping.
+For projects using `unstable_cache`, a tagged server-side fetch can be:
 
----
+```ts
+import { unstable_cache } from 'next/cache'
 
-## ISR and Cache Invalidation
-
-### Cache Tags with `unstable_cache`
-
-Use Next.js 14+ `unstable_cache` with tags for fine-grained cache invalidation:
-
-```typescript
-import { unstable_cache } from 'next/cache';
-
-const getProducts = unstable_cache(
+export const getProducts = unstable_cache(
   async () => {
-    const res = await fetch('http://api.plt.local/products');
-    return res.json();
+    const response = await fetch('http://api.plt.local/products')
+    return response.json()
   },
-  ['products'],  // cache key
+  ['products'],
   { tags: ['products'], revalidate: 3600 }
-);
+)
 ```
 
-### On-Demand Revalidation API
+Use the installed Next.js cache API. Current versions accept `revalidateTag(tag, 'max')`
+for stale-while-revalidate; choose the documented immediate-expiration API when required.
+Do not silently change webhook freshness guarantees. Authenticate revalidation endpoints,
+validate tags, and check response status; see [CMS](../cms-integration.md).
 
-Create a revalidation endpoint for webhooks:
+For shared ISR caching, the capability supports Valkey/Redis:
 
-```typescript
-// app/api/revalidate/route.ts
-import { revalidateTag } from 'next/cache';
-import { NextRequest } from 'next/server';
+```js
+import { createNextConfig } from '@platformatic/next'
 
-export async function POST(request: NextRequest) {
-  const { tags } = await request.json();
-
-  for (const tag of tags) {
-    revalidateTag(tag);
+export default createNextConfig({
+  server: { port: Number(process.env.PORT || 3000) },
+  cache: {
+    adapter: 'valkey',
+    url: process.env.PLT_VALKEY_HOST,
+    prefix: 'storefront'
   }
-
-  return Response.json({ revalidated: true, tags });
-}
+})
 ```
 
-### Multi-Worker Cache Behavior
+Require the cache URL when this configuration is enabled; never log credentials.
+Cache Components require compatible Next.js versions and their matching configuration.
+Do not assume default in-memory cache invalidation reaches all workers or replicas.
+Verify shared cache, tag propagation, namespace, and expiration with the selected adapter.
 
-**Important:** Cache tags work across Watt workers. When you call `revalidateTag()`, it invalidates the cache in all worker instances.
+## Troubleshooting
 
-### CMS Webhook Pattern
+- Port conflicts: inspect the configured listener and owner; Watt does not automatically
+  rewrite ports. Choose another explicit port or an ephemeral one when appropriate.
+- API/middleware/images: exercise real routes and assets through the public gateway.
+- Cache invalidation: test multiple workers and replicas, not only a single request.
+- Production assets: retain `.next`, public assets, manifests, and required dependencies
+  for the chosen deployment; do not assume native TS stripping replaces the build.
 
-For headless CMS integration (Contentful, Sanity, etc.):
-
-1. CMS webhook triggers your content-worker service
-2. Content-worker parses the content type
-3. Content-worker calls Next.js revalidate API
-
-```javascript
-// In content-worker service
-app.post('/webhook/cms', async (req) => {
-  const contentType = req.body.sys.contentType.sys.id;
-  const tagMap = {
-    'product': 'products',
-    'article': 'articles',
-    'page': 'pages'
-  };
-
-  const tag = tagMap[contentType];
-  if (tag) {
-    await fetch('http://frontend.plt.local/api/revalidate', {
-      method: 'POST',
-      body: JSON.stringify({ tags: [tag] })
-    });
-  }
-});
-```
-
----
-
-## Performance Optimization
-
-### Standalone Output Mode
-
-For production, use standalone output for smaller images:
-
-```javascript
-// next.config.mjs
-export default {
-  output: 'standalone',
-};
-```
-
-### Multithreaded SSR with Workers
-
-Configure workers for parallel SSR processing:
-
-```json
-{
-  "runtime": {
-    "workers": {
-      "static": "{PLT_NEXT_WORKERS}"
-    }
-  }
-}
-```
-
-**CPU Scaling Rule**: Set CPU limit = `PLT_NEXT_WORKERS × 1000m`
-
-Example for 4 workers:
-```bash
-PLT_NEXT_WORKERS=4
-# Requires: cpu limit = 4000m (4 cores)
-```
-
-### Distributed Caching
-
-Share ISR cache across replicas with Valkey/Redis:
-
-```json
-{
-  "cache": {
-    "adapter": "valkey",
-    "url": "{PLT_VALKEY_HOST}"
-  }
-}
-```
-
-### Optimized Production watt.json
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/next/3.0.0.json",
-  "application": {
-    "basePath": "/",
-    "commands": {
-      "development": "next dev",
-      "build": "next build",
-      "production": "next start"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "0.0.0.0",
-      "port": "{PORT}"
-    },
-    "workers": {
-      "static": "{PLT_NEXT_WORKERS}"
-    }
-  },
-  "cache": {
-    "adapter": "valkey",
-    "url": "{PLT_VALKEY_HOST}"
-  }
-}
-```
-
-### Why Watt is Faster
-
-Watt uses **SO_REUSEPORT** (Linux kernel feature) to distribute connections across workers with zero coordination overhead—eliminating the ~30% performance tax from PM2/cluster module IPC-based load balancing.
-
-Benchmarks show **93% latency improvement** vs traditional approaches.
-
-For full details, see [../performance.md](../performance.md)
+See [Next configuration](https://docs.platformatic.dev/docs/reference/next/configuration)
+for listener, adapter, caching, and standalone options.

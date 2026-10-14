@@ -1,282 +1,92 @@
-# NestJS Integration with Platformatic Watt
+# NestJS with Watt 4
 
-## Package
-```
-@platformatic/node
-```
+Detect `nest-cli.json` or `@nestjs/core`. The dedicated capability is **`@platformatic/nest`**.
+An existing generic `@platformatic/node` integration can remain when intentionally needed;
+do not silently change its bootstrap contract. Install compatible Watt 4 dependencies only
+with authorization.
 
-## Detection
-- `nest-cli.json` exists
-- `package.json` contains `@nestjs/core` in dependencies
+## Configuration
 
-## watt.json Configuration
+ESM `watt.config.ts`:
 
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "nest start --watch",
-      "build": "nest build",
-      "production": "node dist/main.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
+```ts
+import { createNestConfig } from '@platformatic/nest'
+
+export default createNestConfig({
+  server: { port: Number(process.env.PORT || 3000) },
+  nest: {
+    adapter: 'express',
+    setup: { path: './setup', name: 'setupApplication' }
   }
-}
-```
-
-### With SWC (Faster Builds)
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "nest start --watch --builder swc",
-      "build": "nest build --builder swc",
-      "production": "node dist/main.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-## Installation
-
-```bash
-npm install wattpm
-```
-
-For SWC builder:
-```bash
-npm install @swc/cli @swc/core --save-dev
-```
-
-## Key Considerations
-
-### Port Configuration
-Update `main.ts` to use environment port:
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0');
-
-  console.log(`Application running on port ${port}`);
-}
-
-bootstrap();
-```
-
-### Build Requirement
-NestJS MUST be built before production. The `dist/main.js` is the entry point.
-
-### Entry Point
-Always `dist/main.js` after build (standard NestJS structure).
-
-## Health Check
-
-Use the `@nestjs/terminus` package:
-
-```bash
-npm install @nestjs/terminus
-```
-
-```typescript
-// health/health.controller.ts
-import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, HttpHealthIndicator } from '@nestjs/terminus';
-
-@Controller('health')
-export class HealthController {
-  constructor(
-    private health: HealthCheckService,
-    private http: HttpHealthIndicator,
-  ) {}
-
-  @Get()
-  @HealthCheck()
-  check() {
-    return this.health.check([]);
-  }
-}
-```
-
-```typescript
-// health/health.module.ts
-import { Module } from '@nestjs/common';
-import { TerminusModule } from '@nestjs/terminus';
-import { HttpModule } from '@nestjs/axios';
-import { HealthController } from './health.controller';
-
-@Module({
-  imports: [TerminusModule, HttpModule],
-  controllers: [HealthController],
 })
-export class HealthModule {}
 ```
 
-## Common Patterns
+Use `adapter: 'fastify'` only when the app already uses or requests that adapter. Point
+`nest.appModule`/output settings at the actual compiled module; monorepo output is not
+always `dist/main.js`. Keep decorators, DI, and Nest compilation; native type stripping
+cannot replace it. Build before `wattpm start`.
 
-### Standard main.ts
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+## Preserve bootstrap customizations
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
+Without a custom production command, the dedicated capability creates the app from
+`AppModule` and **does not run `main.ts`** in production. Move global pipes, prefixes,
+CORS, Swagger, and other setup into a shared setup module called by both paths.
 
-  // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+`setup.ts` (compiled by the existing Nest build):
 
-  // CORS
-  app.enableCors();
+```ts
+import { ValidationPipe } from '@nestjs/common'
+import type { INestApplication } from '@nestjs/common'
 
-  // Global prefix
-  app.setGlobalPrefix('api');
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0');
-}
-
-bootstrap();
-```
-
-### With Swagger
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  const config = new DocumentBuilder()
-    .setTitle('API')
-    .setVersion('1.0')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0');
-}
-
-bootstrap();
-```
-
-### Graceful Shutdown
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  // Enable graceful shutdown hooks
-  app.enableShutdownHooks();
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0');
-}
-
-bootstrap();
-```
-
-## Monorepo Support
-
-For NestJS monorepo, specify the project:
-```json
-{
-  "application": {
-    "commands": {
-      "development": "nest start --watch my-app",
-      "build": "nest build my-app",
-      "production": "node dist/apps/my-app/main.js"
-    }
-  }
+export function setupApplication (app: INestApplication): void {
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
+  app.enableCors()
+  app.setGlobalPrefix('api')
 }
 ```
 
-## Environment Configuration
+Existing `main.ts` can retain standalone/development startup:
 
-Use `@nestjs/config`:
-```typescript
-// app.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+```ts
+import { NestFactory } from '@nestjs/core'
+import { AppModule } from './app.module.js'
+import { setupApplication } from './setup.js'
 
-@Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-Access in services:
-```typescript
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-
-@Injectable()
-export class AppService {
-  constructor(private configService: ConfigService) {}
-
-  getPort(): number {
-    return this.configService.get<number>('PORT', 3000);
-  }
+async function bootstrap (): Promise<void> {
+  const app = await NestFactory.create(AppModule)
+  setupApplication(app)
+  await app.listen(Number(process.env.PORT || 3000), process.env.HOST || '127.0.0.1')
 }
+
+await bootstrap()
 ```
 
-## Common Issues
+Adapt imports and top-level startup to the project's existing module convention.
+Ensure the setup file lands in the output where the capability expects it. Do not
+add a second `listen()` to the setup callback.
 
-### @nestjs/cli not found
-Ensure `@nestjs/cli` is installed:
-```bash
-npm install @nestjs/cli --save-dev
-```
+## Build, health, and environment
 
-### Build errors
-Run `nest build` manually to see detailed errors. Check TypeScript configuration.
+- Preserve `nest build`, optional SWC (`@swc/cli`, `@swc/core`), and `nest-cli` assets/watch settings.
+- For monorepos, preserve project-targeted builds and actual `dist/apps/<name>` output.
+- Use `@nestjs/terminus` health routes only when implemented; configure probes against
+  their actual prefixed path, not an invented `/health`.
+- Keep `@nestjs/config` and existing env loading. Listener values in configuration must
+  be read explicitly; the runtime does not inject `PORT`.
+- Preserve Swagger setup and DB connection lifecycle in the shared setup/module hooks.
 
-### Hot reload not working
-Ensure `--watch` flag is in development command. Check `nest-cli.json`:
-```json
-{
-  "compilerOptions": {
-    "watchAssets": true
-  }
-}
-```
+## Shutdown
 
-### Port already in use
-Ensure you're reading from `process.env.PORT` and binding to `0.0.0.0`.
+Use managed Nest lifecycle hooks for owned resources. For custom commands/standalone
+listeners, inspect [shutdown](https://docs.platformatic.dev/docs/reference/runtime/shutdown)
+and use awaited `registerCloseCallback()` where appropriate; exported Node factories
+are not automatically invoked in child-process command mode. Avoid duplicate cleanup.
+
+## Common issues
+
+- Production lost validation/auth/prefix: inspect shared setup; `main.ts` may be bypassed.
+- Build output not found: inspect actual app module, project build, and output directory.
+- Watch broken: retain Nest CLI/watch-assets configuration.
+- Port conflict: inspect the owning listener rather than assuming automatic reassignment.
+
+See [Nest configuration](https://docs.platformatic.dev/docs/reference/nest/configuration).

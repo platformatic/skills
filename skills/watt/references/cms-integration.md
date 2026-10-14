@@ -1,391 +1,219 @@
-# CMS Integration with Platformatic Watt
+# CMS integration with Watt 4
 
-Guide for integrating headless CMS platforms (Contentful, Sanity, Strapi, etc.) with Watt.
+Use a separate content application when webhook traffic/cache invalidation should be
+isolated from business APIs. Typical topology: public Gateway → Next.js/API/content-worker;
+CMS webhooks enter the Gateway's protected content route. Isolation permits per-application
+workers, but independent pod scaling requires a corresponding deployment design.
 
----
+Retain Contentful/Sanity/Strapi SDKs, cache semantics, preview behavior, and mock data.
+Do not expose cache invalidation merely because the caller normally uses internal mesh.
 
-## Architecture Overview
+## Configuration and routing
 
-```
-                    ┌─────────────────────────────────────┐
-                    │           Watt Runtime              │
-                    │                                     │
-   Browser ────────▶│  ┌─────────────────────────────┐   │
-                    │  │         Composer            │   │
-                    │  └──────────┬──────────────────┘   │
-                    │             │                       │
-                    │    ┌────────┼────────┐             │
-                    │    ▼        ▼        ▼             │
-                    │ ┌─────┐ ┌─────┐ ┌─────────────┐   │
-                    │ │Next │ │ API │ │Content      │   │
-                    │ │.js  │ │     │ │Worker       │   │
-                    │ └─────┘ └─────┘ └──────┬──────┘   │
-                    └────────────────────────│───────────┘
-                                             │
-   CMS Webhook ──────────────────────────────┘
+The content worker can be a Platformatic Service. In an ESM TypeScript package:
+
+```ts
+import { createServiceConfig } from '@platformatic/service'
+
+export default createServiceConfig({
+  plugins: { paths: ['./src/app.ts'] }
+})
 ```
 
-**Key components:**
-- **Next.js**: SSR frontend with cached content
-- **API**: Business logic service
-- **Content Worker**: Handles CMS webhooks and cache invalidation
+Install compatible `@platformatic/service` and its needed dependencies only with permission.
+The root declares `applications`; Gateway uses `gateway.applications`:
 
----
+```js
+import { createGatewayConfig } from '@platformatic/gateway'
 
-## Why a Separate Content Worker?
-
-1. **Isolation**: Webhook processing doesn't block business-critical API calls
-2. **Independent scaling**: Scale content operations separately
-3. **Rate limiting**: Easier to add queuing for burst webhook traffic
-4. **Separation of concerns**: CMS logic isolated from core application
-
----
-
-## Project Structure
-
-```
-my-app/
-├── watt.json
-├── web/
-│   ├── composer/
-│   │   └── watt.json
-│   ├── storefront/          # Next.js frontend
-│   │   ├── watt.json
-│   │   └── app/
-│   ├── api/                 # Business API
-│   │   ├── watt.json
-│   │   └── src/
-│   └── content-worker/      # CMS webhooks
-│       ├── watt.json
-│       └── src/
-```
-
----
-
-## Content Worker Service
-
-### watt.json
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/service/3.0.0.json",
-  "service": {
-    "openapi": true
-  },
-  "plugins": {
-    "paths": ["./src/app.ts"]
-  }
-}
-```
-
-Install in `web/content-worker`:
-
-```bash
-npm install @platformatic/service fastify
-```
-
-Ensure `package.json` is ESM:
-
-```json
-{
-  "type": "module"
-}
-```
-
-### Webhook Handler
-
-```typescript
-// src/app.ts
-import type { FastifyInstance } from 'fastify';
-
-export default async function (fastify: FastifyInstance) {
-  // Health check
-  fastify.get('/health', async () => ({ status: 'ok' }));
-
-  // CMS webhook endpoint
-  fastify.post('/webhook/cms', async (request, reply) => {
-    const secret = request.headers['x-webhook-secret'];
-
-    // Verify webhook secret
-    if (secret !== process.env.CMS_WEBHOOK_SECRET) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
-    const payload = request.body as CMSWebhookPayload;
-    const contentType = payload.sys?.contentType?.sys?.id;
-
-    // Map content types to cache tags
-    const tagMap: Record<string, string> = {
-      'product': 'products',
-      'article': 'articles',
-      'page': 'pages',
-      'category': 'categories',
-    };
-
-    const tag = tagMap[contentType];
-    if (tag) {
-      // Call Next.js revalidate API
-      await fetch('http://storefront.plt.local/api/revalidate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: [tag] }),
-      });
-
-      fastify.log.info({ contentType, tag }, 'Cache invalidated');
-    }
-
-    return { success: true };
-  });
-}
-
-interface CMSWebhookPayload {
-  sys: {
-    contentType?: {
-      sys: {
-        id: string;
-      };
-    };
-  };
-}
-```
-
----
-
-## Next.js Revalidation Endpoint
-
-```typescript
-// app/api/revalidate/route.ts
-import { revalidateTag } from 'next/cache';
-import { NextRequest } from 'next/server';
-
-export async function POST(request: NextRequest) {
-  // Optional: verify internal request
-  const origin = request.headers.get('origin');
-
-  const { tags } = await request.json();
-
-  for (const tag of tags) {
-    revalidateTag(tag);
-  }
-
-  return Response.json({
-    revalidated: true,
-    tags,
-    timestamp: Date.now(),
-  });
-}
-```
-
----
-
-## Composer Routing
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/composer/2.0.0.json",
-  "composer": {
-    "services": [
-      {
-        "id": "storefront",
-        "origin": "internal://storefront",
-        "proxy": { "prefix": "/" }
-      },
-      {
-        "id": "api",
-        "origin": "internal://api",
-        "proxy": { "prefix": "/api/v1" }
-      },
-      {
-        "id": "content-worker",
-        "origin": "internal://content-worker",
-        "proxy": { "prefix": "/content" }
-      }
+export default createGatewayConfig({
+  server: { hostname: '0.0.0.0', port: Number(process.env.PORT || 3042) },
+  gateway: {
+    applications: [
+      { id: 'storefront', proxy: { prefix: '/' } },
+      { id: 'api', proxy: { prefix: '/api/v1', rewritePrefix: '/' } },
+      { id: 'content-worker', proxy: { prefix: '/content', rewritePrefix: '/' } }
     ]
   }
+})
+```
+
+Verify overlapping prefixes and actual rewriting. The webhook route below becomes
+`https://your-domain.com/content/webhook/cms` only when this routing is applied correctly.
+Do not proxy all private/admin routes automatically.
+
+## Contentful webhook fragment
+
+Merge the handler into the existing plugin and retain its coded-error convention.
+Example reply codes below are application examples, not new Platformatic package codes.
+Use JSON schema validation/body limits in production and provider signatures where available.
+
+```ts
+import type { FastifyInstance } from 'fastify'
+
+interface ContentfulTypeIdentity {
+  id?: string
+}
+
+interface ContentfulContentType {
+  sys?: ContentfulTypeIdentity
+}
+
+interface ContentfulMetadata {
+  contentType?: ContentfulContentType
+}
+
+interface ContentfulPayload {
+  sys?: ContentfulMetadata
+}
+
+interface ContentfulRoute {
+  Body: ContentfulPayload
+}
+
+const tagMap: Record<string, string> = {
+  product: 'products',
+  article: 'articles',
+  page: 'pages',
+  category: 'categories'
+}
+
+export default async function (app: FastifyInstance) {
+  app.get('/health', async () => ({ status: 'ok' }))
+  app.post<ContentfulRoute>('/webhook/cms', async (request, reply) => {
+    const secret = process.env.CMS_WEBHOOK_SECRET
+
+    // Fail closed if the expected secret is absent or the request does not match it.
+    if (!secret || request.headers['x-webhook-secret'] !== secret) {
+      return reply.code(401).send({ code: 'APP_CMS_UNAUTHORIZED', error: 'Unauthorized' })
+    }
+
+    const contentType = request.body?.sys?.contentType?.sys?.id
+    if (typeof contentType !== 'string') {
+      return reply.code(400).send({ code: 'APP_CMS_INVALID_PAYLOAD', error: 'Invalid payload' })
+    }
+    const tag = Object.hasOwn(tagMap, contentType) ? tagMap[contentType] : undefined
+    if (!tag) {
+      return { success: true, ignored: true }
+    }
+
+    const token = process.env.REVALIDATION_SECRET
+    if (!token) {
+      return reply.code(503).send({ code: 'APP_CMS_REVALIDATION_UNAVAILABLE', error: 'Unavailable' })
+    }
+
+    let response: Response
+    try {
+      response = await fetch('http://storefront.plt.local/api/revalidate', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ tags: [tag] }),
+        signal: AbortSignal.timeout(5000)
+      })
+      await response.arrayBuffer()
+    } catch {
+      app.log.warn({ contentType, tag }, 'Cache revalidation transport failed')
+      return reply.code(502).send({ code: 'APP_CMS_REVALIDATION_FAILED', error: 'Revalidation failed' })
+    }
+
+    if (!response.ok) {
+      return reply.code(502).send({ code: 'APP_CMS_REVALIDATION_FAILED', error: 'Revalidation failed' })
+    }
+
+    app.log.info({ contentType, tag }, 'Cache revalidation requested')
+    return { success: true }
+  })
 }
 ```
 
-CMS webhook URL: `https://your-domain.com/content/webhook/cms`
+Preserve provider retry/idempotency behavior and the app's existing coded-error convention;
+do not acknowledge success when revalidation fails.
 
----
+## Protected Next.js revalidation
 
-## Contentful-Specific Setup
+Match the installed Next.js API. This example uses stale-while-revalidate with
+`revalidateTag(tag, 'max')`; immediate invalidation requires the documented API for the
+selected version. Do not change the user's freshness guarantee silently.
 
-### Environment Variables
+```ts
+import { revalidateTag } from 'next/cache'
 
-```bash
-CONTENTFUL_SPACE_ID=abc123xyz
-CONTENTFUL_ACCESS_TOKEN=xxx...
-CONTENTFUL_PREVIEW_TOKEN=xxx...
-CONTENTFUL_WEBHOOK_SECRET=my-secret-123
-```
+interface RevalidationPayload {
+  tags?: unknown
+}
 
-### Content Fetching with Cache Tags
+const allowedTags = new Set(['products', 'articles', 'pages', 'categories'])
 
-```typescript
-// lib/contentful.ts
-import { unstable_cache } from 'next/cache';
-
-const client = createClient({
-  space: process.env.CONTENTFUL_SPACE_ID!,
-  accessToken: process.env.CONTENTFUL_ACCESS_TOKEN!,
-});
-
-export const getProducts = unstable_cache(
-  async () => {
-    const entries = await client.getEntries({
-      content_type: 'product',
-    });
-    return entries.items;
-  },
-  ['contentful-products'],
-  { tags: ['products'], revalidate: 3600 }
-);
-
-export const getArticles = unstable_cache(
-  async () => {
-    const entries = await client.getEntries({
-      content_type: 'article',
-    });
-    return entries.items;
-  },
-  ['contentful-articles'],
-  { tags: ['articles'], revalidate: 3600 }
-);
-```
-
-### Webhook Configuration in Contentful
-
-1. Go to **Settings** → **Webhooks**
-2. Create new webhook:
-   - **URL**: `https://your-domain.com/content/webhook/cms`
-   - **Triggers**: Entry publish, Entry unpublish
-   - **Headers**: `x-webhook-secret: your-secret`
-   - **Content type filter**: Select relevant types
-
----
-
-## Mock Data for Development
-
-Enable development without CMS credentials:
-
-```typescript
-// lib/contentful.ts
-const USE_MOCK = !process.env.CONTENTFUL_SPACE_ID;
-
-export const getProducts = unstable_cache(
-  async () => {
-    if (USE_MOCK) {
-      return mockProducts;
-    }
-    const entries = await client.getEntries({ content_type: 'product' });
-    return entries.items;
-  },
-  ['products'],
-  { tags: ['products'] }
-);
-
-// Mock data matching Contentful structure
-const mockProducts = [
-  {
-    sys: { id: '1' },
-    fields: {
-      title: 'Mock Product',
-      slug: 'mock-product',
-      price: 99.99,
-    },
-  },
-];
-```
-
----
-
-## Draft Preview Mode
-
-### Enable Draft Mode
-
-```typescript
-// app/api/draft/route.ts
-import { draftMode } from 'next/headers';
-import { redirect } from 'next/navigation';
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
-  const slug = searchParams.get('slug');
-
-  if (secret !== process.env.CONTENTFUL_PREVIEW_SECRET) {
-    return new Response('Invalid token', { status: 401 });
+export async function POST (request: Request): Promise<Response> {
+  const secret = process.env.REVALIDATION_SECRET
+  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+    return Response.json({ code: 'APP_CMS_UNAUTHORIZED' }, { status: 401 })
   }
 
-  draftMode().enable();
-  redirect(slug || '/');
+  let payload: RevalidationPayload
+  try {
+    payload = await request.json()
+  } catch {
+    return Response.json({ code: 'APP_CMS_INVALID_PAYLOAD' }, { status: 400 })
+  }
+  const tags = payload?.tags
+  if (!Array.isArray(tags) || tags.length > 20 ||
+      !tags.every(tag => typeof tag === 'string' && allowedTags.has(tag))) {
+    return Response.json({ code: 'APP_CMS_INVALID_TAGS' }, { status: 400 })
+  }
+
+  for (const tag of tags) {
+    revalidateTag(tag, 'max')
+  }
+  return Response.json({ revalidated: true, tags })
 }
 ```
 
-### Use Preview Client
+Use a dedicated internal token and keep it out of URLs/client bundles/logs. Merely
+checking `Origin` does not authenticate server-to-server calls. Test cache propagation
+across workers/replicas with the chosen adapter; see [Next.js](frameworks/nextjs.md).
 
-```typescript
-export const getProduct = async (slug: string, preview = false) => {
-  const client = preview ? previewClient : deliveryClient;
-  const entries = await client.getEntries({
-    content_type: 'product',
-    'fields.slug': slug,
-  });
-  return entries.items[0];
-};
-```
+## Contentful fetching and mocks
 
----
+Document `CONTENTFUL_SPACE_ID`, delivery/preview access tokens, `CMS_WEBHOOK_SECRET`,
+and `REVALIDATION_SECRET` in `.env.example` with no real credentials. Preserve the
+actual variable names and map Contentful's webhook header to the configured secret.
+Contentful webhook triggers commonly include publish/unpublish and content-type filters.
 
-## Other CMS Platforms
+Use `createClient` from `contentful`, and `unstable_cache` when supported by the project's
+Next version. Cache keys/tags can distinguish products (`products`) and articles (`articles`).
+Initialize real SDK clients only when credentials exist; use an explicit development-only
+mock mode otherwise. Do not silently serve mock content in production when secrets are missing.
+Mock entries should preserve Contentful `sys.id` and `fields` shapes.
 
-### Sanity
+## Draft preview
 
-```typescript
-// Webhook payload structure
-interface SanityWebhook {
-  _type: string;
-  _id: string;
-}
+Keep a separate preview client/token and protect the draft endpoint. Current Next versions
+require awaiting `draftMode()` before `.enable()`. Require a configured nonempty preview
+secret and validate the requested slug against permitted local paths/content lookup to
+prevent open redirects. Do not use an unchecked `redirect(slug)` from a URL parameter.
+Preserve preview vs delivery cache separation so draft content cannot leak to public users.
 
-const tagMap: Record<string, string> = {
-  'product': 'products',
-  'post': 'articles',
-};
-```
+## Sanity and Strapi
 
-### Strapi
+- Sanity webhooks typically identify documents through `_type` and `_id`; map only
+  supported types to allowlisted tags and verify provider signatures/secrets.
+- Strapi commonly provides `model` and `entry.id`; inspect the installed version's
+  payload/auth contract rather than assuming Contentful structure.
+- Preserve provider retries, duplicate handling, batching, and logging of outcomes without secrets.
 
-```typescript
-// Webhook payload structure
-interface StrapiWebhook {
-  model: string;
-  entry: { id: number };
-}
+## Completion
 
-const tagMap: Record<string, string> = {
-  'product': 'products',
-  'article': 'articles',
-};
-```
-
----
-
-## Best Practices
-
-1. **Verify webhooks**: Always check webhook secrets
-2. **Log invalidations**: Track what's being invalidated for debugging
-3. **Batch invalidations**: Group multiple changes when possible
-4. **Use mock data**: Enable development without CMS credentials
-5. **Isolate content operations**: Use a dedicated worker service
-6. **Monitor webhook latency**: Slow webhooks can delay content updates
-
----
+With permission, test valid/invalid/missing secrets, malformed payloads, ignored content
+types, upstream failures, cache freshness, duplicate webhooks, preview auth, and redirects.
+Report version-dependent APIs and unverified multi-worker cache behavior explicitly.
 
 ## Resources
 
-- [Contentful Webhooks](https://www.contentful.com/developers/docs/webhooks/)
-- [Next.js Cache Revalidation](https://nextjs.org/docs/app/building-your-application/caching#revalidating)
-- [Sanity Webhooks](https://www.sanity.io/docs/webhooks)
-- [Strapi Webhooks](https://docs.strapi.io/dev-docs/backend-customization/webhooks)
+- [Contentful webhooks](https://www.contentful.com/developers/docs/webhooks/)
+- [Next.js revalidation](https://nextjs.org/docs/app/api-reference/functions/revalidateTag)
+- [Sanity webhooks](https://www.sanity.io/docs/webhooks)
+- [Strapi webhooks](https://docs.strapi.io/dev-docs/backend-customization/webhooks)

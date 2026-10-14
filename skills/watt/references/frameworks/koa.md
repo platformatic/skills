@@ -1,224 +1,72 @@
-# Koa Integration with Platformatic Watt
+# Koa with Watt 4
 
-## Package
-```
-@platformatic/node
-```
+Detect `koa` and use compatible `wattpm`/`@platformatic/node`. Preserve middleware,
+routes, error handling, logger, and package manager; install only with permission.
 
-## Detection
-- `package.json` contains `koa` in dependencies
+## Factory and configuration
 
-## watt.json Configuration
+The Node capability recognizes a returned Koa instance. Prefer this contract instead
+of returning only `app.callback()` or calling `listen()` inside a managed factory:
 
-### JavaScript Project
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.js",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
+```js
+import Koa from 'koa'
+import Router from '@koa/router'
+import bodyParser from 'koa-bodyparser'
+import cors from '@koa/cors'
+
+export function create () {
+  const app = new Koa()
+  const router = new Router()
+  router.get('/health', ctx => {
+    ctx.body = { status: 'ok' }
+  })
+
+  app.use(cors())
+  app.use(bodyParser())
+  app.use(router.routes())
+  app.use(router.allowedMethods())
+  return app
 }
 ```
 
-### TypeScript Project
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.ts",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.ts"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
+ESM `watt.config.js`:
+
+```js
+import { createNodeConfig } from '@platformatic/node'
+
+export default createNodeConfig({
+  main: './src/index.js',
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-}
+})
 ```
 
-## Installation
+Match the actual path; use `.mjs` if the existing package is not ESM. For TS, preserve
+its transform/type-checking toolchain and install matching Koa/router types as needed.
 
-```bash
-npm install wattpm
-```
+## Middleware and logging
 
-For TypeScript, no additional runtime tooling is required on Node.js 22+.
-If you use ESM imports in `.ts` files, set `"type": "module"` in `package.json`.
+Put error middleware first. Preserve status mapping, but do not expose internal error
+messages to clients. Application errors should have stable codes following the app's
+existing convention. Emit errors to the structured logger and redact secrets.
 
-## Key Considerations
+Pino request logging can record method, URL, status, and elapsed time around `await next()`.
+Keep stateful middleware scoped to the app factory and retain `router.allowedMethods()`.
+Do not remove existing sessions, authentication, or body limits when integrating.
 
-### Host Binding
-Koa must bind to `0.0.0.0` for Watt:
-```javascript
-const Koa = require('koa');
-const app = new Koa();
+## Standalone listeners and shutdown
 
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0');
-```
+A retained standalone entrypoint chooses its own address; Watt does not write `PORT`.
+Use `0.0.0.0` for public containers, not all internal apps. For an in-thread self-listening
+app, export an awaited `close()` for the existing server or register cleanup with
+`registerCloseCallback()` from `@platformatic/globals`. Custom commands own child-process
+cleanup. A process-only `SIGTERM` handler is not a substitute for Watt's worker lifecycle.
 
-### Middleware Stack
-Koa middleware works normally. Ensure async/await patterns are used.
+## Common issues
 
-## Health Check
-
-Add a health check route:
-```javascript
-const Router = require('@koa/router');
-const router = new Router();
-
-router.get('/health', (ctx) => {
-  ctx.body = { status: 'ok' };
-});
-
-app.use(router.routes());
-```
-
-## Common Patterns
-
-### Standard Setup
-```javascript
-const Koa = require('koa');
-const Router = require('@koa/router');
-const bodyParser = require('koa-bodyparser');
-const cors = require('@koa/cors');
-
-const app = new Koa();
-const router = new Router();
-
-// Middleware
-app.use(cors());
-app.use(bodyParser());
-
-// Health check
-router.get('/health', (ctx) => {
-  ctx.body = { status: 'ok' };
-});
-
-// API routes
-router.get('/api/users', async (ctx) => {
-  ctx.body = { users: [] };
-});
-
-app.use(router.routes());
-app.use(router.allowedMethods());
-
-// Start server
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
-});
-```
-
-### With TypeScript
-```typescript
-import Koa from 'koa';
-import Router from '@koa/router';
-import bodyParser from 'koa-bodyparser';
-
-const app = new Koa();
-const router = new Router();
-
-router.get('/health', (ctx) => {
-  ctx.body = { status: 'ok' };
-});
-
-app.use(bodyParser());
-app.use(router.routes());
-app.use(router.allowedMethods());
-
-const port = parseInt(process.env.PORT || '3000');
-app.listen(port, '0.0.0.0');
-```
-
-### Error Handling
-```javascript
-app.use(async (ctx, next) => {
-  try {
-    await next();
-  } catch (err) {
-    ctx.status = err.status || 500;
-    ctx.body = {
-      error: err.message
-    };
-    ctx.app.emit('error', err, ctx);
-  }
-});
-
-app.on('error', (err, ctx) => {
-  console.error('Server error:', err);
-});
-```
-
-## Environment Variables
-
-- `PORT` - Server port
-- `PLT_SERVER_HOSTNAME` - Bind address
-- `PLT_SERVER_LOGGER_LEVEL` - Log level
-- `NODE_ENV` - Environment (development/production)
-
-## Logging Integration
-
-For structured logging compatible with Watt:
-```javascript
-const pino = require('pino');
-
-const logger = pino({
-  level: process.env.PLT_SERVER_LOGGER_LEVEL || 'info'
-});
-
-app.use(async (ctx, next) => {
-  const start = Date.now();
-  await next();
-  const ms = Date.now() - start;
-  logger.info({ method: ctx.method, url: ctx.url, ms }, 'request');
-});
-```
-
-## Graceful Shutdown
-
-Implement graceful shutdown:
-```javascript
-const server = app.listen(port, '0.0.0.0');
-
-process.on('SIGTERM', () => {
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
-```
-
-## Common Issues
-
-### Context type errors (TypeScript)
-Install `@types/koa` and `@types/koa__router`:
-```bash
-npm install @types/koa @types/koa__router --save-dev
-```
-
-### Middleware order
-Koa middleware executes in order added. Ensure error handlers are first.
-
-### Response already sent
-Always use `return` after sending response in middleware to prevent further processing.
+- TS context types: retain matching `@types/koa` and router package types.
+- Middleware order: errors first, parsing before routes, auth before protected handlers.
+- Response already sent: avoid continuing middleware after final responses.
+- Prefix/listener problems: test Gateway routes, actual address, and internal application ID.
