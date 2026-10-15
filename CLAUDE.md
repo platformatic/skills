@@ -7,9 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Repository**: `platformatic/skills` (https://github.com/platformatic/skills)
 
 This is an **Agent Skill** following the [Agent Skills open standard](https://agentskills.io/),
-not a Node.js application. Skills are Markdown instructions/reference documentation;
-`scripts/prepare-watt-context.mjs` prepares immutable reconciliation snapshots. There is
-no package.json or application build/test system.
+not a Node.js application. Skills are Markdown instructions/reference documentation.
+There is no package.json or application build/test system.
 
 The `skills/` directory is portable across any skills-compatible agent (Claude Code, Cursor, GitHub Copilot, Gemini CLI, etc.). The `agents/`, `commands/`, and `.claude-plugin/` directories are Claude Code-specific extensions that add slash commands and sub-agents.
 

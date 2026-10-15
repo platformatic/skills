@@ -233,44 +233,6 @@ The `skills/` directory follows the [Agent Skills specification](https://agentsk
 
 ## Development
 
-### Prepare a Watt reconciliation
-
-Download the Watt skill source from `platformatic/platformatic` and prepare a
-context file for your coding agent, without modifying this repository's skills:
-
-```sh
-node scripts/prepare-watt-context.mjs
-
-# Select a published branch, tag, or commit instead of main:
-node scripts/prepare-watt-context.mjs --ref <branch-or-tag-or-commit>
-
-# Or read unpublished working files from a local Platformatic checkout:
-node scripts/prepare-watt-context.mjs --path /path/to/platformatic
-
-# A direct path to the Watt skill directory is also accepted:
-node scripts/prepare-watt-context.mjs --path /path/to/platformatic/docs/skills/watt
-```
-
-Requires Node.js 22.19.0+ and network access to GitHub. Set `GITHUB_TOKEN` if
-authentication or higher API rate limits are needed. The selected ref must contain
-`docs/skills/watt`; unpublished local Platformatic changes cannot be downloaded.
-Use `--path` instead to copy local working files, without Git or network access.
-Relative paths resolve from the current working directory. `--path` and `--ref`
-are mutually exclusive; omitting both selects GitHub's `main`.
-
-The script resolves the ref to a commit, verifies each download against Git's blob
-hash, and saves an immutable snapshot in `tmp/watt/upstream/<commit>/`. Previous
-snapshots are retained. Local sources use `tmp/watt/upstream/local-<sha256>/`, with
-a digest covering filenames and contents rather than an inferred Git commit.
-It generates `tmp/watt/CONTEXT.md` with provenance, file
-inventories, differences, reconciliation goals, and constraints. Repeated runs
-refresh only this generated context; modified snapshots and user-owned context
-files are never overwritten. All generated files are ignored by Git.
-
-Open your preferred agent manually in this repository and give it
-`tmp/watt/CONTEXT.md`. Review its proposed reconciliation before approving edits.
-The script does not reconcile files, launch agents, commit, push, or publish.
-
 ### Testing Locally
 
 ```bash
