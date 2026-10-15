@@ -1,325 +1,75 @@
-# PHP Integration with Platformatic Watt
+# PHP, WordPress, and Laravel compatibility
 
-Watt can run PHP applications (Laravel, WordPress, and custom PHP) directly inside the Node.js runtime using the `@platformatic/php` stackable.
+`@platformatic/php` is an **external capability** backed by the native Rust-based
+`@platformatic/php-node` integration. Its Watt 4 compatibility is not established by
+the core Watt skill. Detect it and retain useful application guidance, but do not install
+an incompatible version or invent a Watt 4 helper/schema by changing a version number.
 
-## Package
-```
-@platformatic/php
-```
+## Compatibility gate
 
-## How It Works
+Before generating configuration, inspect the installed package's version, exports,
+schema, Node engine/native ABI requirements, and its own release documentation.
+Confirm Watt 4 module configuration, managed listeners, lifecycle, and worker support.
+If unsupported, report a blocker and preserve the working project; do not silently
+upgrade it or substitute another framework.
 
-The PHP stackable uses `@platformatic/php-node`, a Rust-based native module that embeds a multi-threaded PHP runtime directly inside Node.js. PHP runs in the Node worker pool, shares cache, auth, and rate-limits with adjacent JS services.
+Do not use removed Watt scaffolding/import commands. Watt 4's Node requirement is
+24.20.0+, but that alone does not establish external native package compatibility.
 
-## Detection
+## Detection and existing application structure
 
-- `composer.json` exists
-- `artisan` file exists (Laravel)
-- `wp-config.php` exists (WordPress)
-- `public/index.php` exists (generic PHP)
+- WordPress: `wp-config.php`, `wp-content`, `wp-admin`, `wp-includes`, `index.php`.
+- Laravel: `artisan`, `composer.json`, `public/index.php`, `app/`, `routes/`, `resources/`.
+- Generic PHP: Composer metadata and a PHP document root/front controller.
 
-## Requirements
+Preserve the actual `docroot`, filesystem permissions, extensions, uploads, and existing
+database infrastructure. Follow the [php-node installation guide](https://github.com/platformatic/php-node)
+for native libraries; a system PHP executable alone may not satisfy embedding requirements.
 
-- Node.js >= 22.19.0
-- PHP binary dependencies installed (see [php-node repository](https://github.com/platformatic/php-node))
-- For WordPress/Laravel with database: MySQL/MariaDB
+## WordPress environment
 
----
+Keep database secrets outside source. Existing `wp-config.php` can read:
 
-## WordPress Configuration
-
-### watt.json for WordPress
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
-  "module": "@platformatic/php",
-  "docroot": "./public",
-  "application": {
-    "basePath": "/"
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-### Directory Structure
-
-```
-wordpress-app/
-├── watt.json
-├── public/
-│   ├── wp-config.php
-│   ├── wp-content/
-│   ├── wp-admin/
-│   ├── wp-includes/
-│   └── index.php
-└── .env
-```
-
-### Environment Variables
-
-```
-PLT_SERVER_HOSTNAME=0.0.0.0
-PLT_SERVER_LOGGER_LEVEL=info
-PORT=3000
-PLT_WP_TYPESCRIPT=false
-
-# WordPress Database
-DB_HOST=localhost
-DB_NAME=wordpress
-DB_USER=root
-DB_PASSWORD=password
-```
-
-### wp-config.php Setup
-
-Ensure `wp-config.php` reads from environment:
 ```php
 define('DB_NAME', getenv('DB_NAME') ?: 'wordpress');
-define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_USER', getenv('DB_USER') ?: 'wordpress');
 define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 ```
 
----
+Require real credentials for production; do not use example/root passwords. Preserve
+WordPress salts, plugin directories, site URLs, and persistent `wp-content` uploads.
 
-## Laravel Configuration
+## Laravel routing
 
-### watt.json for Laravel
+Preserve the front-controller rewrite contract of the installed capability. Older
+packages used `rewriter.rules` to route requests through `/index.php`; verify that
+option before emitting a new module configuration. Keep Laravel's Composer dependencies,
+APP_KEY, storage/cache permissions, routes, and existing `.env` intact.
 
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
-  "module": "@platformatic/php",
-  "docroot": "./public",
-  "rewriter": {
-    "rules": [
-      {
-        "match": "^/(?!index\\.php)(.*)$",
-        "rewrite": "/index.php/$1"
-      }
-    ]
-  },
-  "application": {
-    "basePath": "/"
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
+## Multi-application and headless architecture
 
-### Rewriter Configuration
+If a compatible capability is available, keep WordPress/Laravel and a Next.js frontend
+as separate application entries in the Watt root, with Gateway public routing. JS
+server-side callers can use `http://wordpress.plt.local` for an internally reachable
+application. Do not assume PHP outbound HTTP clients automatically use the Node mesh;
+verify the package's integration first.
 
-The `rewriter` implements Laravel's front controller pattern, routing all requests through `index.php`:
+Container setups must match native PHP libraries to architecture/libc. A development
+MySQL/MariaDB container can use persistent volumes and a health check, with credentials
+injected from an untracked env file or secret store. Avoid baking secrets or uploads into
+an immutable image. Verify DB reachability, plugin loading, rewrites, and graceful shutdown.
 
-```json
-{
-  "rewriter": {
-    "rules": [
-      {
-        "match": "^/(?!index\\.php)(.*)$",
-        "rewrite": "/index.php/$1"
-      }
-    ]
-  }
-}
-```
+## Common issues
 
-### Directory Structure
-
-```
-laravel-app/
-├── watt.json
-├── artisan
-├── composer.json
-├── public/
-│   └── index.php
-├── app/
-├── routes/
-├── resources/
-└── .env
-```
-
----
-
-## Generic PHP Configuration
-
-### watt.json for Custom PHP
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/php/3.0.0.json",
-  "module": "@platformatic/php",
-  "docroot": "./public",
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-Any PHP files in the `docroot` directory are automatically routed.
-
----
-
-## Installation
-
-### Create New PHP Service
-
-```bash
-npx wattpm@latest create --module=@platformatic/php
-```
-
-### Add to Existing Project
-
-```bash
-npm install wattpm @platformatic/php
-```
-
-### Install PHP Dependencies
-
-Follow the [php-node installation guide](https://github.com/platformatic/php-node) for your platform.
-
----
-
-## Multi-Service Setup (WordPress + Next.js)
-
-For headless WordPress with a JavaScript frontend:
-
-### Root watt.json
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/watt/3.0.0.json",
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  },
-  "services": [
-    {
-      "id": "frontend",
-      "path": "./web/frontend"
-    },
-    {
-      "id": "wordpress",
-      "path": "./web/wp"
-    },
-    {
-      "id": "composer",
-      "path": "./web/composer"
-    }
-  ]
-}
-```
-
-### Inter-Service Communication
-
-PHP services can call adjacent JS services with intra-process RPC using internal hostnames:
-```
-http://frontend.plt.local
-http://wordpress.plt.local
-```
-
----
-
-## Docker Setup for WordPress
-
-### docker-compose.yml
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - PLT_SERVER_HOSTNAME=0.0.0.0
-      - PORT=3000
-      - DB_HOST=db
-      - DB_NAME=wordpress
-      - DB_USER=wordpress
-      - DB_PASSWORD=wordpress
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: mysql:8
-    environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=wordpress
-      - MYSQL_USER=wordpress
-      - MYSQL_PASSWORD=wordpress
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  mysql_data:
-```
-
----
-
-## Common Issues
-
-### PHP Binary Not Found
-
-Install PHP dependencies per your platform:
-- macOS: `brew install php`
-- Ubuntu: `apt install php php-mysql php-xml php-mbstring`
-- See [php-node docs](https://github.com/platformatic/php-node) for full requirements
-
-### Database Connection Failed
-
-1. Ensure MySQL is running
-2. Check environment variables are set
-3. Verify database credentials in wp-config.php or .env
-
-### WordPress Plugins Not Loading
-
-Ensure `wp-content/plugins/` is in the correct location within your `docroot`.
-
-### Laravel Routes Not Working
-
-Verify the `rewriter` rules are correctly configured to route through `index.php`.
-
----
+- Native loading: inspect supported OS/architecture, native library dependencies, and Node ABI.
+- DB connection: check actual host/network and env names without logging passwords.
+- Plugins missing: confirm `wp-content/plugins` under the real document root.
+- Laravel 404: check front-controller rewriting and permissions against installed docs.
 
 ## Resources
 
-- [Platformatic PHP Stackable](https://github.com/platformatic/php)
-- [php-node Repository](https://github.com/platformatic/php-node)
-- [WordPress + Next.js Example](https://github.com/platformatic/watt-next-wordpress)
-- [Laravel Example](https://github.com/platformatic/watt-next-laravel)
-- [npm Package](https://www.npmjs.com/package/@platformatic/php)
+- [PHP capability](https://github.com/platformatic/php)
+- [PHP native runtime](https://github.com/platformatic/php-node)
+- [WordPress + Next.js example](https://github.com/platformatic/watt-next-wordpress) — inspect its versions before reuse.
+- [Laravel example](https://github.com/platformatic/watt-next-laravel) — inspect its versions before reuse.

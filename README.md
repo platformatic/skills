@@ -1,13 +1,14 @@
 # Platformatic Watt Agent Skill
 
-An [Agent Skill](https://agentskills.io/) for integrating and deploying [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) in any Node.js project. Works with any skills-compatible agent: Claude Code, Cursor, GitHub Copilot, Gemini CLI, Junie, and [more](https://skills.sh/).
+An [Agent Skill](https://agentskills.io/) for scaffolding, integrating, migrating, and deploying [Platformatic Watt 4](https://docs.platformatic.dev/docs/Overview) applications. Works with any skills-compatible agent: Claude Code, Cursor, GitHub Copilot, Gemini CLI, Junie, and [more](https://skills.sh/).
 
-Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
+Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`, `/workflow`).
 
 ## Features
 
-- **Automatic Framework Detection**: Detects Next.js, Nuxt, React Router, TanStack Start, Vite, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
-- **Configuration Generation**: Creates optimized `watt.json` for your framework
+- **Framework Detection**: Detects Next.js, Nuxt, Nitro, React Router, TanStack Start, Vite, Express, Fastify, Koa, Remix, Astro, and NestJS. PHP, WordPress, and Laravel use an external capability whose Watt 4 compatibility must be checked
+- **Configuration and Scaffolding**: Writes `watt.config.*`, application code, workspaces, gateways, services, and databases directly, without removed Watt generators/import commands
+- **Watt 3 Migration**: Reviews configuration, listeners, environment semantics, tracing, globals, and shutdown before an authorized upgrade
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, Kubernetes tuning, CPU profiling with `wattpm pprof`, flamegraph generation with `@platformatic/flame`, and heap snapshots
 - **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks and migrations from KafkaJS or node-rdkafka (separate `kafka` skill)
@@ -38,13 +39,17 @@ claude --plugin-dir ./watt-skill
 
 ## Skills
 
-This repository contains two skills, each a standalone `SKILL.md` following the [Agent Skills specification](https://agentskills.io/specification):
+This repository contains three skills, each a standalone `SKILL.md` following the [Agent Skills specification](https://agentskills.io/specification):
 
 ### `watt` — Platformatic Watt Integration
 
-Detects your framework, generates `watt.json`, installs dependencies, and creates deployment configs.
+Detects your framework, writes Watt 4 configuration and application files, proposes compatible
+dependencies, and creates deployment configs. Installation, migrations, startup, profiling,
+and deployment require authorization; status/analyzer inspection does not install packages.
 
-**Capabilities**: init, deploy (Docker/Kubernetes/cloud), migrate, enterprise multi-service setup, wattpm CLI guidance, scheduled jobs, CMS integration, observability.
+**Capabilities**: init/integration, create/scaffold, services/gateways/databases, Watt 3→4 migration,
+deploy (Docker/Kubernetes/cloud), enterprise multi-application setup, wattpm CLI guidance,
+scheduled tasks, CMS integration, observability, and CPU/heap profiling.
 
 ### `kafka` — Kafka Event-Driven Microservices
 
@@ -83,12 +88,16 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 ```
 /watt                     # auto-detect and integrate
 /watt init nextjs         # integrate with framework hint
+/watt create              # write a new project/application directly
+/watt service             # service, gateway, or database guidance
 /watt deploy docker       # generate Docker config
 /watt deploy k8s          # generate Kubernetes manifests
 /watt enterprise          # multi-service setup
-/watt migrate             # migrate existing app
+/watt migrate             # review and migrate a Watt 3 project to Watt 4
+/watt poc                 # onboard a non-Watt application for a POC
 /watt cli                 # wattpm CLI reference
 /watt status              # check Watt configuration health
+/watt-status              # read-only status command (Claude Code)
 
 /kafka                    # Kafka overview
 /kafka hooks              # kafka-hooks webhooks
@@ -114,6 +123,7 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 |-----------|---------|-----------|
 | Next.js | `@platformatic/next` | `next.config.{js,ts,mjs}` |
 | Nuxt | `@platformatic/nuxt` | `nuxt.config.{ts,js,mjs}` |
+| Nitro | `@platformatic/nitro` | Standalone Nitro / Nitro Vite plugin, after specific frameworks |
 | React Router | `@platformatic/react-router` | `react-router.config.{ts,js}` |
 | TanStack Start | `@platformatic/tanstack` | `@tanstack/react-start` in dependencies |
 | Vite | `@platformatic/vite` | `vite.config.{js,ts,mjs}` (fallback for Vite apps) |
@@ -122,55 +132,62 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 | Express | `@platformatic/node` | `express` in dependencies |
 | Fastify | `@platformatic/node` | `fastify` in dependencies |
 | Koa | `@platformatic/node` | `koa` in dependencies |
-| NestJS | `@platformatic/node` | `nest-cli.json` or `@nestjs/core` |
-| WordPress | `@platformatic/php` | `wp-config.php` |
-| Laravel | `@platformatic/php` | `artisan` + `composer.json` |
-| PHP | `@platformatic/php` | `composer.json` + `public/index.php` |
+| NestJS | `@platformatic/nest` | `nest-cli.json` or `@nestjs/core` |
+| WordPress | External `@platformatic/php` (compatibility check) | `wp-config.php` |
+| Laravel | External `@platformatic/php` (compatibility check) | `artisan` + `composer.json` |
+| PHP | External `@platformatic/php` (compatibility check) | `composer.json` + `public/index.php` |
 
 Several frameworks build on Vite (React Router, TanStack Start, Remix, Astro) and ship a `vite.config.*`. Detection matches the specific framework first and falls back to `@platformatic/vite` only when no more specific signal is present.
 
 ## Requirements
 
-- **Node.js**: v22.19.0 or higher
+- **Watt 4.0.0 Node.js requirement**: v24.20.0 or higher, including CI and production images
+- Compatible Watt 4 runtime/capability packages; preserve the existing package manager and lockfile
+- Explicit approval before migrating an existing Watt 3 project; external PHP/addon support is not assumed
 
 ## Configuration Reference
 
-### watt.json Structure
+### Executable configuration
 
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "your-dev-command",
-      "build": "your-build-command",
-      "production": "your-start-command"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
+For a new ESM package (`"type": "module"`), a single Next.js app can use `watt.config.js`:
+
+```js
+import { createNextConfig } from '@platformatic/next'
+
+export default createNextConfig({
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-}
+})
 ```
 
-### Runtime Placement Rule
+Recognized names are `watt.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, and `.cjs`, with
+one per directory. `.ts`/`.js` follow the package module type; `.mts`/`.mjs` force ESM
+and `.cts`/`.cjs` force CommonJS. Native TypeScript stripping accepts erasable syntax;
+it does not replace framework builds or type checking.
 
-- **Single-config application schema** (`@platformatic/node`, `@platformatic/next`, `@platformatic/remix`, `@platformatic/astro`, `@platformatic/php`): use a `runtime` block for runtime settings (`logger`, `server`, `workers`, telemetry, etc.).
-- **Root multi-app orchestrator schema** (`watt` / `@platformatic/runtime`): keep runtime settings in the root-level `runtime` block.
+A multi-application root uses `createWattConfig` and `applications`/`autoload`; a single
+app with runtime options can use `application: { config, workers }`. Keep workers and
+dependencies on application entries, and listener settings in the capability configuration.
+There is no runtime `entrypoint` or root `server`; Watt does not rewrite ports or inject `PORT`.
+Use helpers exported by installed packages or plain objects with `module` and their actual
+schema shape. Preserve supported capability runtime wrapping and dynamic configuration source.
+
+See [scaffolding](skills/watt/references/scaffolding.md),
+[framework integration](skills/watt/references/frameworks.md), and
+[Watt 3 migration](skills/watt/references/migration-v4.md) for detailed contracts.
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
-| `PLT_SERVER_HOSTNAME` | Bind address | `0.0.0.0` |
-| `PLT_SERVER_LOGGER_LEVEL` | Log level | `info` |
+| `HOST` | Bind address explicitly read in this example; use `0.0.0.0` for public containers | `127.0.0.1` |
+| `LOG_LEVEL` | Log level when explicitly read by runtime/application configuration | `info` |
+
+These are example names, not automatic injected settings. Preserve existing env names
+when integrating. Document names in `.env.example`, never overwrite `.env` or expose secrets.
 
 ## Project Structure
 
@@ -182,6 +199,12 @@ watt-skill/
 │   │   └── references/
 │   │       ├── frameworks/      # Framework-specific configs
 │   │       ├── deployment/      # Deployment guides
+│   │       ├── scaffolding.md   # Direct project/application scaffolding
+│   │       ├── frameworks.md    # Detection and framework-reference index
+│   │       ├── services.md      # Services, gateways, databases, and tests
+│   │       ├── integration.md   # Local/remote application integration
+│   │       ├── migration-v4.md  # Watt 3 to Watt 4 migration
+│   │       ├── operations.md    # Operations and detailed-reference index
 │   │       └── troubleshooting.md
 │   ├── kafka/
 │   │   ├── SKILL.md             # Kafka integration skill
@@ -237,10 +260,8 @@ See [troubleshooting guide](skills/watt/references/troubleshooting.md) for commo
 
 ### Quick Fixes
 
-**Node.js version too old:**
-```bash
-nvm install 22 && nvm use 22
-```
+**Node.js version too old:** Use the project's existing version manager to select
+Node.js 24.20.0+ and update CI/container versions consistently.
 
 **wattpm not found:**
 ```bash
@@ -255,7 +276,7 @@ PORT=3001 npm run dev
 ## Resources
 
 - [Platformatic Watt Documentation](https://docs.platformatic.dev/docs/Overview)
-- [Watt 3 Announcement](https://blog.platformatic.dev/introducing-watt-3)
+- [Watt 4 Migration Guide](https://docs.platformatic.dev/docs/guides/migrate-v4)
 - [Agent Skills Standard](https://agentskills.io/) — open format specification
 - [Skills.sh Directory](https://skills.sh/) — discover and install agent skills
 - [Claude Code Skills Guide](https://code.claude.com/docs/en/skills) — Claude Code-specific docs

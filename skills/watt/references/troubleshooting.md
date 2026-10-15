@@ -1,596 +1,140 @@
-# Troubleshooting Platformatic Watt
+# Troubleshooting Watt 4
 
-## Common Issues and Solutions
+Inspect versions/configuration before changing anything. Do not silently upgrade Watt 3,
+install packages through an unpinned `npx`, kill unrelated processes, delete lockfiles,
+or disclose secrets. Explain findings and request authorization for corrective operations.
 
-### Node.js Version Issues
+## Node.js and major versions
 
-**Error**: `Watt requires Node.js v22.19.0 or higher`
+Watt 4.0.0 requires **Node.js 24.20.0+** in development, CI, build images, and production.
+Check `node --version` with permission and inspect package engines. Use the project's
+existing version manager (on this host, installed `tj/n`) rather than assuming nvm/fnm.
+Align runtime/capability majors; external PHP/addons require separate compatibility checks.
 
-**Solution**:
-```bash
-# Check current version
-node --version
+## Missing, competing, or invalid configuration
 
-# Install Node.js 22 using nvm
-nvm install 22
-nvm use 22
+Recognized files are `watt.config.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`. Keep one per
+directory. Legacy JSON beside a module is not merged. Missing config can be valid for an
+inferred application; do not automatically create a file or invoke removed generators.
 
-# Or using fnm
-fnm install 22
-fnm use 22
+- `.ts`/`.js` follow package `type`; `.mjs`/`.mts` force ESM; `.cjs`/`.cts` force CommonJS.
+- JSON parsing is not module validation. Static reading does not prove schema validity.
+- Importing the config executes code, including async/dynamic exports; obtain permission.
+- Helpers must match installed exports; plain objects need `module` and actual nested shape.
+- Inspect the loader's strict schema, not only legacy properties in exported schema files.
 
-# Verify
-node --version  # Should show v22.x.x
+Use [scaffolding](scaffolding.md), [frameworks](frameworks.md), or [migration](migration-v4.md)
+as appropriate. Never JSON-round-trip modules containing expressions/functions/comments.
+
+## CLI missing or removed commands
+
+Inspect local manifests/lockfiles and binary availability. If missing, propose compatible
+dependencies with the existing manager; do not automatically download via `npx --version`.
+Core Watt handles dev/build/start/management. Utilities `install`, `update`, `resolve`,
+`migrate` use `wattpm-utils`. Generators/import and CLI `config`/`patch-config` are removed.
+See [CLI](wattpm-cli.md) for replacements and exact-help requirements.
+
+## Ports, hostnames, and container reachability
+
+Root `entrypoint`/`server` are gone. Managed listener settings belong to the owning
+capability; custom commands/self-listening apps choose their own addresses. Watt observes
+them and does not write `PORT` or try the next free port.
+
+- Identify the listener/process owning a port before proposing termination.
+- Choose an explicit different port or `0` for a supported ephemeral listener.
+- Bind public container listeners to `0.0.0.0`; preserve internal-only services.
+- Multiple workers on a fixed port need supported sharing/port assignment for that OS.
+- Mesh addresses use configured application IDs, not necessarily directory names.
+
+For local diagnostics, use platform-appropriate tools such as `lsof -i :3000` on macOS.
+Do not default to `kill -9`. Stop only authorized processes gracefully.
+
+## TypeScript and framework builds
+
+Native stripping accepts erasable types; it does not handle enums, parameter properties,
+decorators, path aliases, TSX builds, or type checking. Preserve framework compilation and
+point `main` at source/build output as appropriate. Use `import type` and respect ESM/CJS.
+Nest production may bypass `main.ts`; preserve setup through the dedicated capability.
+
+In CI, set a Node version **at least 24.20.0**, not an unverified older `24` image/runtime.
+Inspect dependencies, output paths, workspace manifests, and lockfile before retrying builds.
+Do not “fix” failures by deleting `node_modules` and the user's lockfile or forcing cache cleanup.
+
+## Health checks and CrashLoopBackOff
+
+Probe implemented application routes or explicitly configured runtime health endpoints.
+`/health` is not automatically present. Prefixes and readiness dependency checks matter.
+Readiness should reflect serving ability; liveness should not kill healthy pods during
+temporary remote DB/API failures. Tune startup probes to the real build/start behavior.
+
+With permission, inspect container logs, `kubectl describe pod`, previous logs, resource
+limits, missing env names, and network/DB access. Do not apply/rollback manifests automatically.
+Check writable cache/temp directories before enforcing a read-only root filesystem.
+
+## Environment and migration semantics
+
+Use `process.env` expressions in Watt 4, not `{VAR_NAME}` interpolation. Explicitly convert
+numeric/boolean values; review absent and empty values individually. Existing variable names
+can remain if explicitly read. `.env` is optional when CI/deployment injects values.
+
+Inspect the installed env-file merge/mode behavior; load required env before configuration
+evaluation. Loading dotenv later in an application cannot fix earlier config reads. Preserve
+framework env conventions and never overwrite secrets or dump a complete env/config object.
+
+## Gateway routing and mesh
+
+Use `@platformatic/gateway` and `gateway.applications`. Internal targets can be identified
+by application ID without Composer's `internal://` origin requirement. Match target IDs,
+prefix/rewritePrefix, framework base paths, redirects, assets, and WebSocket behavior.
+Do not assume catch-all ordering guarantees precedence; test overlapping routes.
+
+```sh
+wattpm ps
+wattpm applications my-app
+wattpm inject my-app api --path /health
 ```
 
----
+Use actual IDs/routes and obtain permission before requests. In multi-app runtimes,
+injection needs an explicit application. Vite development may need `.plt.local` in
+allowed hosts. Browser code cannot directly resolve internal mesh hostnames.
 
-### Port Already in Use
+## Next.js, ISR, and CMS
 
-**Error**: `Error: listen EADDRINUSE: address already in use :::3000`
+- Standalone: configure both Next output and capability standalone mode only when required.
+- Turbopack: inspect supported versions rather than disabling it globally.
+- Static exports: use a deliberate static-hosting path instead of assuming SSR capability support.
+- Cache: verify adapter, URL, namespace, TTL, ISR vs Cache Components, and tag propagation.
+- Revalidation: use the installed Next API, authenticated allowlisted tags, and the
+  required freshness mode; `revalidateTag(tag, 'max')` is stale-while-revalidate.
+- Preview: await current `draftMode()` APIs and validate auth/local redirect targets.
 
-**Solutions**:
+See [Next](frameworks/nextjs.md) and [CMS](cms-integration.md). Do not claim invalidation
+reaches every worker/replica without testing the chosen shared cache setup.
 
-1. **Find and kill the process**:
-```bash
-# Find process using port 3000
-lsof -i :3000
+## Plugins, memory, and shutdown
 
-# Kill it
-kill -9 <PID>
-```
+Fastify registration needs actual imported functions, not package-name strings. Preserve
+encapsulation and decorator dependencies. For memory growth, measure worker count/heap
+and capture authorized CPU/heap diagnostics instead of blindly changing child-process flags.
+See [performance](performance.md).
 
-2. **Use a different port**:
-```bash
-PORT=3001 npm run dev
-```
+Use `registerCloseCallback()` for asynchronous Watt-owned cleanup; legacy close events
+are not emitted. Managed factories close framework/server first. Custom commands must
+close child-process resources themselves; exports alone are insufficient. Avoid duplicate
+callbacks and register before shutdown starts. Review [shutdown](https://docs.platformatic.dev/docs/reference/runtime/shutdown).
 
-3. **Let Watt auto-select**:
-Watt automatically tries the next available port if the default is occupied.
+## Scheduler and external compatibility
 
----
+Use application tasks in the examined Watt 4 contract, not an unverified root callback
+array. Check retry total-attempt semantics, job IDs, replicas, pause/run behavior, and
+idempotency. See [scheduler](scheduler.md).
 
-### watt.json Not Found
+PHP/Watt-Extra/hosting integrations are external contracts. Report compatibility blockers;
+do not mechanically convert their schemas or claim Vercel framework hosting runs Watt.
 
-**Error**: `Cannot find watt.json`
+## Getting help
 
-**Solution**:
-```bash
-# Initialize Watt in project
-npm create wattpm
-
-# Or create manually with appropriate framework config
-```
-
----
-
-### Invalid watt.json
-
-**Error**: `Error parsing watt.json: Unexpected token`
-
-**Solution**:
-```bash
-# Validate JSON syntax
-node -e "JSON.parse(require('fs').readFileSync('watt.json'))"
-
-# Common issues:
-# - Trailing commas
-# - Missing quotes on keys
-# - Comments (JSON doesn't support comments)
-```
-
----
-
-### wattpm Command Not Found
-
-**Error**: `wattpm: command not found`
-
-**Solutions**:
-
-1. **Install wattpm**:
-```bash
-npm install wattpm
-```
-
-2. **Use npx**:
-```bash
-npx wattpm dev
-npx wattpm build
-npx wattpm start
-```
-
-3. **Check package.json scripts**:
-```json
-{
-  "scripts": {
-    "dev": "wattpm dev",
-    "build": "wattpm build",
-    "start": "wattpm start"
-  }
-}
-```
-
----
-
-### App Not Binding to Correct Host
-
-**Error**: Application not accessible from Docker/Kubernetes
-
-**Cause**: App binding to `localhost` instead of `0.0.0.0`
-
-**Solution**: Update your app to bind to `0.0.0.0`:
-
-```javascript
-// Express
-app.listen(process.env.PORT || 3000, '0.0.0.0');
-
-// Fastify
-fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
-
-// NestJS
-await app.listen(process.env.PORT || 3000, '0.0.0.0');
-```
-
----
-
-### TypeScript Compilation Errors
-
-**Error**: `Cannot find module` or type errors
-
-**Solutions**:
-
-1. **Use Node.js 22.19+** (native type stripping support)
-
-2. **Keep TypeScript for type-checking only (optional)**:
-```bash
-npm install typescript --save-dev
-```
-
-3. **Update watt.json commands**:
-```json
-{
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.ts",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.ts"
-    }
-  }
-}
-```
-
----
-
-### Build Fails in Production
-
-**Error**: Build succeeds locally but fails in CI/CD
-
-**Solutions**:
-
-1. **Check Node.js version in CI**:
-```yaml
-# GitHub Actions
-- uses: actions/setup-node@v4
-  with:
-    node-version: '22'
-```
-
-2. **Ensure all dependencies are in package.json**:
-```bash
-# Check for missing deps
-npm ls
-```
-
-3. **Clear npm cache**:
-```bash
-npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install
-```
-
----
-
-### Health Check Failing
-
-**Error**: Container keeps restarting / Health check timeout
-
-**Solutions**:
-
-1. **Ensure health endpoint exists**:
-```javascript
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-```
-
-2. **Increase startup time**:
-```yaml
-# Kubernetes
-startupProbe:
-  httpGet:
-    path: /health
-    port: 3000
-  failureThreshold: 30
-  periodSeconds: 5
-```
-
-3. **Check application logs**:
-```bash
-# Docker
-docker logs <container>
-
-# Kubernetes
-kubectl logs <pod>
-```
-
----
-
-### Memory Issues
-
-**Error**: `JavaScript heap out of memory`
-
-**Solutions**:
-
-1. **Increase Node.js memory**:
-```bash
-NODE_OPTIONS="--max-old-space-size=4096" npm start
-```
-
-2. **Update watt.json**:
-```json
-{
-  "application": {
-    "commands": {
-      "production": "node --max-old-space-size=4096 dist/index.js"
-    }
-  }
-}
-```
-
-3. **Capture runtime diagnostics**:
-```bash
-# CPU profile for a running application
-wattpm pprof start my-app api-application
-wattpm pprof stop my-app api-application
-
-# Heap snapshot for memory analysis
-wattpm heap-snapshot my-app api-application
-```
-
----
-
-### Environment Variables Not Loading
-
-**Error**: `process.env.VAR_NAME` is undefined
-
-**Solutions**:
-
-1. **Check .env file exists**:
-```bash
-ls -la .env
-```
-
-2. **Ensure correct format**:
-```
-# .env
-VAR_NAME=value
-# No spaces around =
-# No quotes needed for simple values
-```
-
-3. **Load dotenv early** (if not using a framework with built-in support):
-```javascript
-// First line of entry file
-require('dotenv').config();
-```
-
-4. **For production, set vars directly**:
-```bash
-export VAR_NAME=value
-# or
-VAR_NAME=value npm start
-```
-
----
-
-### Next.js Specific Issues
-
-**Static Export Error**:
-```
-Error: Static export is not supported with Watt
-```
-**Solution**: Change `next.config.js`:
-```javascript
-// Remove or change:
-// output: 'export'
-
-// Use:
-module.exports = {
-  // output: 'standalone' for Docker
-}
-```
-
-**Turbopack Issues**:
-Disable Turbopack temporarily:
-```json
-{
-  "scripts": {
-    "dev": "next dev"  // Remove --turbo flag
-  }
-}
-```
-
----
-
-### Fastify Plugin Errors
-
-**Error**: `Plugin must be a function`
-
-**Solution**: Check plugin registration:
-```javascript
-// Correct
-fastify.register(require('@fastify/cors'));
-
-// Incorrect
-fastify.register('@fastify/cors');  // String, not module
-```
-
----
-
-### NestJS Build Errors
-
-**Error**: `nest-cli.json not found`
-
-**Solution**:
-```bash
-# Ensure NestJS CLI is installed
-npm install @nestjs/cli --save-dev
-
-# Create nest-cli.json
-{
-  "compilerOptions": {
-    "assets": ["**/*.graphql"],
-    "watchAssets": true
-  }
-}
-```
-
----
-
-### Docker Build Fails
-
-**Error**: `npm ERR! code ENOENT` during Docker build
-
-**Solutions**:
-
-1. **Check .dockerignore**:
-Don't ignore `package.json` or `package-lock.json`
-
-2. **Use correct COPY order**:
-```dockerfile
-# Copy package files first
-COPY package*.json ./
-RUN npm ci
-
-# Then copy source
-COPY . .
-```
-
-3. **Verify all files exist**:
-```bash
-docker build --no-cache -t app .
-```
-
----
-
-### Kubernetes Pod CrashLoopBackOff
-
-**Diagnosis**:
-```bash
-# Check pod status
-kubectl describe pod <pod-name>
-
-# Check logs
-kubectl logs <pod-name> --previous
-```
-
-**Common causes**:
-1. Health check failing (see above)
-2. Missing environment variables
-3. Database connection failing
-4. Insufficient resources
-
----
-
-### Composer Service Discovery Issues
-
-**Error**: Service not found or routing not working
-
-**Solutions**:
-
-1. **Use `internal://` origin for in-memory communication**:
-```json
-{
-  "composer": {
-    "services": [
-      {
-        "id": "api",
-        "origin": "internal://api",
-        "proxy": { "prefix": "/api" }
-      }
-    ]
-  }
-}
-```
-
-2. **Check service ID matches directory name**:
-The service `id` must match the directory name under `web/`.
-
-3. **Verify route priority**:
-More specific prefixes should come after less specific ones:
-```json
-{
-  "services": [
-    { "id": "frontend", "proxy": { "prefix": "/" } },
-    { "id": "api", "proxy": { "prefix": "/api/v1" } }
-  ]
-}
-```
-
----
-
-### Worker Configuration Issues
-
-**Error**: Workers not starting or wrong service scaled
-
-**Solutions**:
-
-1. **Use service directory name as key**:
-```json
-{
-  "workers": {
-    "storefront": 4,
-    "api": 2
-  }
-}
-```
-Use `"storefront"`, not `"web/storefront"` or the full path.
-
-2. **Environment variable for dynamic config**:
-```json
-{
-  "workers": {
-    "storefront": "{PLT_STOREFRONT_WORKERS}"
-  }
-}
-```
-
----
-
-### Environment Variable Injection Issues
-
-**Error**: `{VAR_NAME}` appearing literally instead of value
-
-**Solutions**:
-
-1. **Use correct syntax**:
-```json
-{
-  "port": "{PORT}",
-  "workers": "{PLT_WORKERS}"
-}
-```
-Note: Use `{VAR_NAME}`, not `${VAR_NAME}` or `$VAR_NAME`.
-
-2. **Ensure variable is set**:
-```bash
-export PORT=3000
-# or
-PORT=3000 npm run dev
-```
-
-3. **Check .env file is loaded**:
-The `.env` file must be in the project root.
-
----
-
-### Next.js ISR Cache Issues in Multi-Worker Setup
-
-**Error**: Cache invalidation not propagating to all workers
-
-**Solutions**:
-
-1. **Use `revalidateTag()` for cache invalidation**:
-```typescript
-import { revalidateTag } from 'next/cache';
-revalidateTag('products');
-```
-This works across all Watt workers.
-
-2. **For distributed deployments, use Valkey/Redis**:
-```json
-{
-  "cache": {
-    "adapter": "valkey",
-    "url": "{PLT_VALKEY_HOST}"
-  }
-}
-```
-
-3. **Create a revalidation API endpoint**:
-```typescript
-// app/api/revalidate/route.ts
-export async function POST(request) {
-  const { tags } = await request.json();
-  for (const tag of tags) {
-    revalidateTag(tag);
-  }
-  return Response.json({ revalidated: true });
-}
-```
-
----
-
-### Inter-Service Communication Not Working
-
-**Error**: `fetch('http://service.plt.local/...')` failing
-
-**Solutions**:
-
-1. **Use correct hostname pattern**:
-```javascript
-// Correct
-fetch('http://api.plt.local/users')
-
-// Incorrect
-fetch('http://api/users')
-fetch('http://localhost:3001/users')
-```
-
-2. **Ensure service is running**:
-```bash
-wattpm info  # List running services
-```
-
-3. **Check service health**:
-```bash
-curl http://localhost:3042/api/health
-```
-
----
-
-## Debugging Tips
-
-### Enable Debug Logging
-```bash
-PLT_SERVER_LOGGER_LEVEL=debug npm run dev
-```
-
-### Check Watt Version
-```bash
-npx wattpm --version
-```
-
-### Validate Configuration
-```bash
-# Check watt.json schema
-node -e "
-const config = require('./watt.json');
-console.log(JSON.stringify(config, null, 2));
-"
-```
-
-### Network Debugging
-```bash
-# Check if port is listening
-netstat -tlnp | grep 3000
-
-# Test health endpoint
-curl -v http://localhost:3000/health
-```
-
-## Getting Help
-
-- **Platformatic Docs**: https://docs.platformatic.dev
-- **GitHub Issues**: https://github.com/platformatic/platformatic/issues
-- **Discord Community**: https://discord.gg/platformatic
+Report version, configuration mode, sanitized symptoms/errors, checks performed, and
+remaining gaps. Links: [Platformatic docs](https://docs.platformatic.dev),
+[issues](https://github.com/platformatic/platformatic/issues),
+[community](https://discord.gg/platformatic). Do not file reports without permission.

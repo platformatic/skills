@@ -1,312 +1,90 @@
-# Fastify Integration with Platformatic Watt
+# Fastify with Watt 4
 
-## Package
-```
-@platformatic/node
-```
+Use `@platformatic/node` for an existing Fastify app, or `@platformatic/service` for
+Platformatic plugin/routes/OpenAPI conventions. Install compatible Watt 4 packages
+only with authorization. Do not silently convert between the two app contracts.
 
-## Detection
-- `package.json` contains `fastify` in dependencies
+## Node capability
 
-## watt.json Configuration
+ESM `src/index.js`:
 
-### Standard Fastify
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.js",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
+```js
+import Fastify from 'fastify'
+
+export async function create () {
+  const app = Fastify({
+    logger: { level: process.env.LOG_LEVEL || 'info' }
+  })
+  app.get('/health', async () => ({ status: 'ok' }))
+  return app
 }
 ```
 
-### With @fastify/cli
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "fastify start -w -l info -P src/app.js",
-      "build": "echo 'No build step required'",
-      "production": "fastify start -l info src/app.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
+ESM `watt.config.js`:
+
+```js
+import { createNodeConfig } from '@platformatic/node'
+
+export default createNodeConfig({
+  main: './src/index.js',
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-}
-```
-
-### TypeScript
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.ts",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.ts"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-## Installation
-
-```bash
-npm install wattpm
-```
-
-If you use Platformatic Service in a multi-service setup, also install:
-
-```bash
-npm install @platformatic/service
-```
-
----
-
-## Platformatic Service (Recommended for Multi-Service)
-
-When running Fastify as a service within Watt's multi-service architecture, use Platformatic Service configuration:
-
-### watt.json (in service directory)
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/service/3.0.0.json",
-  "service": {
-    "openapi": true
-  },
-  "plugins": {
-    "paths": ["./src/app.ts"]
-  }
-}
-```
-
-### package.json (TypeScript + ESM)
-
-```json
-{
-  "type": "module"
-}
-```
-
-Use type-only imports for Fastify types:
-
-### Plugin Registration Pattern
-
-Export a default async function that receives the Fastify instance:
-
-```typescript
-// src/app.ts
-import type { FastifyInstance } from 'fastify';
-
-export default async function (fastify: FastifyInstance) {
-  // Register routes directly
-  fastify.get('/health', async () => ({ status: 'ok' }));
-
-  // Or register route plugins with prefix
-  fastify.register(import('./routes/users.js'), { prefix: '/users' });
-  fastify.register(import('./routes/products.js'), { prefix: '/products' });
-}
-```
-
-### Features
-
-| Option | Description |
-|--------|-------------|
-| `service.openapi: true` | Auto-generate OpenAPI/Swagger documentation |
-| Node.js type stripping (v22+) | Runs `.ts` plugins without `plugins.typescript` |
-| `plugins.paths` | Array of plugin files to load |
-
-### OpenAPI Documentation
-
-With `openapi: true`, access documentation at:
-- `/documentation` - Swagger UI
-- `/documentation/json` - OpenAPI spec
-
----
-
-## Key Considerations
-
-### Host Binding
-Ensure Fastify binds to `0.0.0.0`:
-```javascript
-const fastify = require('fastify')({ logger: true });
-
-fastify.listen({
-  port: process.env.PORT || 3000,
-  host: '0.0.0.0'
-});
-```
-
-### Pino Logger Integration
-Fastify uses Pino by default, which aligns with Watt's logging. You can share configuration:
-```javascript
-const fastify = require('fastify')({
-  logger: {
-    level: process.env.PLT_SERVER_LOGGER_LEVEL || 'info'
-  }
-});
-```
-
-### Plugin System
-Fastify plugins work normally within Watt. No special configuration needed.
-
-## Health Check
-
-Register a health check route:
-```javascript
-fastify.get('/health', async (request, reply) => {
-  return { status: 'ok' };
-});
-```
-
-## Common Patterns
-
-### Standard Setup
-```javascript
-const fastify = require('fastify')({
-  logger: {
-    level: process.env.PLT_SERVER_LOGGER_LEVEL || 'info'
-  }
-});
-
-// Register plugins
-fastify.register(require('@fastify/cors'));
-fastify.register(require('@fastify/helmet'));
-
-// Routes
-fastify.get('/health', async () => ({ status: 'ok' }));
-
-// Start server
-const start = async () => {
-  try {
-    await fastify.listen({
-      port: process.env.PORT || 3000,
-      host: '0.0.0.0'
-    });
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
-```
-
-### With TypeScript
-```typescript
-import Fastify from 'fastify';
-
-const fastify = Fastify({
-  logger: {
-    level: process.env.PLT_SERVER_LOGGER_LEVEL || 'info'
-  }
-});
-
-fastify.get('/health', async () => {
-  return { status: 'ok' };
-});
-
-const start = async () => {
-  try {
-    await fastify.listen({
-      port: parseInt(process.env.PORT || '3000'),
-      host: '0.0.0.0'
-    });
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
-```
-
-### With @fastify/autoload
-```javascript
-const path = require('path');
-const AutoLoad = require('@fastify/autoload');
-
-module.exports = async function (fastify, opts) {
-  fastify.register(AutoLoad, {
-    dir: path.join(__dirname, 'plugins'),
-    options: Object.assign({}, opts)
-  });
-
-  fastify.register(AutoLoad, {
-    dir: path.join(__dirname, 'routes'),
-    options: Object.assign({}, opts)
-  });
-};
-```
-
-## Environment Variables
-
-- `PORT` - Server port
-- `PLT_SERVER_HOSTNAME` - Bind address
-- `PLT_SERVER_LOGGER_LEVEL` - Pino log level
-
-## Graceful Shutdown
-
-If your `@platformatic/node` entrypoint exports `create()` and returns a Fastify instance, Watt can call `app.close()` automatically. You can still add Fastify-specific cleanup hooks:
-```javascript
-fastify.addHook('onClose', async (instance) => {
-  // Cleanup connections
 })
 ```
 
-If your entrypoint starts listening by itself instead of returning the Fastify instance, export a `close()` function so Watt can stop it cleanly. If you also want to react to Watt shutdown events, use `@platformatic/globals` instead of typing `globalThis.platformatic` manually:
-```javascript
-const { getGlobal } = require('@platformatic/globals')
+Watt starts/closes the returned instance. Do not listen twice. For existing Fastify CLI
+custom commands, preserve the pipeline only when needed and review child-process listener
+and shutdown responsibilities in the [migration guide](../migration-v4.md).
 
-async function close() {
-  await fastify.close()
-}
+## Platformatic Service
 
-getGlobal()?.events?.on('close', () => {
-  void close()
+`watt.config.ts` for an ESM TypeScript plugin application:
+
+```ts
+import { createServiceConfig } from '@platformatic/service'
+
+export default createServiceConfig({
+  service: { openapi: true },
+  plugins: { paths: ['./src/app.ts'] }
 })
-
-module.exports = { close }
 ```
 
-## Common Issues
+`src/app.ts`:
 
-### Address already in use
-Watt automatically tries the next available port. Ensure your code reads from `process.env.PORT`.
+```ts
+import type { FastifyInstance } from 'fastify'
 
-### Validation errors
-If using @fastify/env, ensure schema allows environment variables from Watt.
+export default async function (app: FastifyInstance) {
+  app.get('/health', async () => ({ status: 'ok' }))
+  app.register(import('./routes/users.js'), { prefix: '/users' })
+}
+```
 
-### Slow startup
-For large plugin trees, consider lazy loading or using `--inspect` to debug startup time.
+The route import must point at an existing plugin; retain the project's TS extension
+resolution strategy. This internal Service example omits a public listener. Add capability
+`server` only when needed. Shared decorators need non-encapsulated plugin paths and
+Fastify type augmentation; see [services](../services.md).
+
+With OpenAPI enabled, inspect the installed Service docs for `/documentation` and
+`/documentation/json`; do not expose admin-only APIs through Gateway unintentionally.
+
+## Plugins, autoload, and cleanup
+
+Fastify plugins and Pino continue to work. Preserve CORS/helmet and existing plugin
+encapsulation/prefixes. `@fastify/autoload` can load plugins and routes separately;
+keep its paths relative to the actual module, using `node:path`/`node:url` for ESM.
+Native TS stripping does not replace non-erasable transformations or type checking.
+
+Use Fastify `onClose` hooks for its owned resources. Self-listening Node entrypoints
+can export `close()`. Additional Watt cleanup uses `registerCloseCallback()`; legacy
+`getGlobal()?.events?.on('close', ...)` no longer runs during Watt 4 shutdown.
+
+## Common issues
+
+- Plugin must be a function: register the imported plugin, not a package-name string.
+- Address in use: inspect the actual listener; Watt does not select the next free port.
+- Env validation: allow only required app variables and preserve existing validation.
+- Slow startup: inspect plugin tree/build pipeline; profiling requires permission.
+- Tests: use `inject()` and close the instance; capability tests are in [services](../services.md).

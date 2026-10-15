@@ -1,223 +1,67 @@
-# Astro Integration with Platformatic Watt
+# Astro with Watt 4
 
-## Package
-```
-@platformatic/astro
-```
+Detect `astro.config.*` or `astro` before plain Vite. Use compatible `wattpm` and
+`@platformatic/astro`; install framework adapters only with authorization.
 
-## Detection Files
-- `astro.config.mjs`
-- `astro.config.ts`
-- `astro.config.js`
+ESM `watt.config.js`:
 
-## watt.json Configuration
+```js
+import { createAstroConfig } from '@platformatic/astro'
 
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/astro/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "astro dev",
-      "build": "astro build",
-      "production": "node ./dist/server/entry.mjs"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-## Installation
-
-```bash
-npm install wattpm @platformatic/astro
-```
-
-## Key Considerations
-
-### Output Mode
-Watt requires server-side rendering. Configure Astro for SSR:
-
-```javascript
-// astro.config.mjs
-import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
-
-export default defineConfig({
-  output: 'server', // or 'hybrid' for partial SSR
-  adapter: node({
-    mode: 'standalone'
-  }),
+export default createAstroConfig({
   server: {
-    port: parseInt(process.env.PORT || '3000'),
-    host: '0.0.0.0'
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-});
+})
 ```
 
-### Required Adapter
-Install the Node.js adapter:
-```bash
-npm install @astrojs/node
-```
+## Rendering and build output
 
-### Static Output Not Supported
-`output: 'static'` (default) won't work with Watt. Use `server` or `hybrid`.
+Preserve the existing adapter. For Node SSR projects, inspect installed Astro and
+`@astrojs/node` compatibility before selecting adapter mode:
 
-## Environment Variables
-
-Create `.env`:
-```
-PORT=3000
-PLT_SERVER_HOSTNAME=0.0.0.0
-PLT_SERVER_LOGGER_LEVEL=info
-PUBLIC_API_URL=https://api.example.com
-```
-
-Access in Astro:
-```astro
----
-// Server-side only
-const secret = import.meta.env.API_SECRET;
-
-// Available on client (PUBLIC_ prefix)
-const apiUrl = import.meta.env.PUBLIC_API_URL;
----
-```
-
-## Common Patterns
-
-### Full SSR Configuration
-```javascript
-// astro.config.mjs
-import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
-import react from '@astrojs/react';
+```js
+import { defineConfig } from 'astro/config'
+import node from '@astrojs/node'
 
 export default defineConfig({
   output: 'server',
-  adapter: node({
-    mode: 'standalone'
-  }),
-  integrations: [react()],
-  server: {
-    port: parseInt(process.env.PORT || '3000'),
-    host: process.env.PLT_SERVER_HOSTNAME || '0.0.0.0'
-  },
-  vite: {
-    server: {
-      watch: {
-        usePolling: true // For Docker/containers
-      }
-    }
-  }
-});
+  adapter: node({ mode: 'standalone' })
+})
 ```
 
-### Hybrid Rendering
-```javascript
-// astro.config.mjs
-import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
+Older Astro versions used `output: 'hybrid'`; do not emit that removed option for
+versions where mixed rendering uses `server` and page-level `prerender` instead.
+Static export hosting is a separate path, not a guarantee of this SSR integration.
 
-export default defineConfig({
-  output: 'hybrid', // Static by default, opt-in to SSR
-  adapter: node({
-    mode: 'standalone'
-  })
-});
+Build before `wattpm start`. Typical Node adapter output includes `dist/server/entry.mjs`
+and `dist/client/`; deploy complete output. Verify the adapter contract with the selected
+capability rather than adding an unconditional production command from another framework.
+
+## Environment, integrations, and health
+
+Keep `import.meta.env` conventions: `PUBLIC_*` values can reach clients; secrets must not.
+Retain React/Vue/Svelte integrations and content collections. Native config TS stripping
+does not replace Astro builds/type checking.
+
+An application-owned `src/pages/health.json.ts` can expose:
+
+```ts
+import type { APIRoute } from 'astro'
+
+export const GET: APIRoute = () => Response.json({ status: 'ok' })
 ```
 
-Then in pages:
-```astro
----
-// This page will be server-rendered
-export const prerender = false;
----
-```
+Probe its actual route (`/health.json` unless routing changes it), not a guessed `/health`.
+Use `export const prerender = false` when the route must execute dynamically and that
+matches the installed Astro rendering mode.
 
-### Health Check Endpoint
-Create `src/pages/health.json.ts`:
-```typescript
-import type { APIRoute } from 'astro';
+## Common issues
 
-export const GET: APIRoute = () => {
-  return new Response(
-    JSON.stringify({ status: 'ok' }),
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-};
-```
+- Missing adapter/server output: inspect Astro version, adapter mode, and build artifacts.
+- Container listener: configure capability hostname `0.0.0.0` for public containers.
+- Docker HMR: merge `vite.server.watch.usePolling: true` only when filesystem watching needs it.
+- Prefix/assets: align Astro base, Gateway prefix, and deployed client assets.
 
-## Build Output
-
-Astro with Node adapter outputs to:
-- `./dist/server/entry.mjs` - Server entry point
-- `./dist/client/` - Static assets
-
-Watt serves both automatically.
-
-## Framework Integrations
-
-Astro works with multiple UI frameworks:
-```bash
-# React
-npx astro add react
-
-# Vue
-npx astro add vue
-
-# Svelte
-npx astro add svelte
-```
-
-All work seamlessly with Watt.
-
-## TypeScript
-
-Astro has built-in TypeScript support. No additional configuration needed for Watt.
-
-## Common Issues
-
-### "output: static" error
-Change to `output: 'server'` or `output: 'hybrid'` in `astro.config.mjs`.
-
-### Missing adapter
-Install and configure `@astrojs/node`:
-```bash
-npm install @astrojs/node
-```
-
-### Port binding issues
-Ensure `server.host` is set to `'0.0.0.0'` in astro.config.
-
-### Build fails
-Check that all dependencies are installed and integrations are properly configured.
-
-### HMR not working in Docker
-Add polling to vite config:
-```javascript
-vite: {
-  server: {
-    watch: {
-      usePolling: true
-    }
-  }
-}
-```
-
-## Content Collections
-
-Astro's content collections work normally with Watt. No special configuration needed.
+See [Astro configuration](https://docs.platformatic.dev/docs/reference/astro/configuration).

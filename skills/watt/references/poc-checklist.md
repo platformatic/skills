@@ -1,345 +1,62 @@
-# POC Preparation Checklist
+# POC preparation checklist
 
-Technical requirements and steps for integrating an existing Node.js application with Platformatic Watt.
-
----
+This is onboarding for a non-Watt application. For an existing Watt 3 project, use
+[migration-v4.md](migration-v4.md) instead of silently upgrading during the POC.
 
 ## Prerequisites
 
-### Development Environment
+- Node.js **24.20.0+**, also supported by the existing application.
+- A working local copy with its normal build/start pipeline understood.
+- Required DB/API access, or isolated local mocks for load tests.
+- Docker only when the selected infrastructure/deployment requires it.
+- Existing package manager, lockfile, module type, and workspace boundaries identified.
+- Agreed scope and authorization before installs, tests, profiling, or startup.
 
-- [ ] **Node.js 22.19+** installed and tested with your application
-- [ ] **Linux or macOS** preferred (Windows possible but may impact performance)
-- [ ] **Docker** installed and running
-- [ ] **Local code editor** for live modifications
+Prefer Linux for testing Linux port-sharing behavior. macOS/Windows multi-worker fixed
+ports may require supported `portAssignment`; do not assume identical performance.
 
-### Application Requirements
+## Make it run
 
-- [ ] Working local copy of your application
-- [ ] Application starts locally without complex rebuild processes
-- [ ] If rebuilds are required, expect significant delays during integration
+1. Detect the app using [frameworks](frameworks.md) and its detailed framework guide.
+2. Add compatible `wattpm` and capability dependencies only with permission.
+3. Write `watt.config.*` directly. Do not invoke generators/import commands or add
+   a second configuration. For a generic Node factory, an ESM example is:
 
-### Infrastructure Access
+```js
+import { createNodeConfig } from '@platformatic/node'
 
-- [ ] Local instances of required databases and third-party APIs, OR
-- [ ] Network access to remote databases/APIs from local machine
-- [ ] **For load testing**: Local mocks of databases and third-party APIs (highly recommended)
-
----
-
-## Quick Start: Make It Run with Watt
-
-### Step 1: Install Dependencies
-
-```bash
-npm install wattpm
-```
-
-Or use directly via npx without installing:
-```bash
-npx wattpm dev
-npx wattpm start
-```
-
-### Step 2: Create watt.json
-
-Create `watt.json` in your project root:
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "main": "index.js"
+export default createNodeConfig({
+  main: './src/server.js',
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
   }
-}
-```
-
-Replace `index.js` with your actual application entrypoint (e.g., `src/server.js`, `dist/main.js`).
-
-### Step 3: Modify Your Entrypoint
-
-Your entrypoint file should export one of:
-
-> Prefer `create()` whenever possible. For `@platformatic/node` black-box entrypoints that call `listen()` themselves, also provide a shutdown path (`close()` and/or a Platformatic `close` event handler) so Watt can stop the app cleanly without exit-timeout warnings.
-
-#### Option A: Export a `create` function (Recommended)
-
-```javascript
-// index.js
-const express = require('express')
-
-async function create() {
-  const app = express()
-
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok' })
-  })
-
-  // Add your routes...
-
-  return app
-}
-
-module.exports = { create }
-```
-
-#### Option B: Export a `close` function
-
-```javascript
-// index.js
-const express = require('express')
-
-const app = express()
-let server
-
-// Your routes...
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' })
-})
-
-server = app.listen(process.env.PORT || 3000)
-
-async function close() {
-  return new Promise((resolve) => {
-    server.close(resolve)
-  })
-}
-
-module.exports = { close }
-```
-
-If you need to hook into Watt shutdown events without making Watt a hard runtime requirement, use `@platformatic/globals`:
-
-```bash
-npm install @platformatic/globals
-```
-
-```javascript
-const { getGlobal } = require('@platformatic/globals')
-
-const platformatic = getGlobal()
-platformatic?.events?.on('close', () => {
-  void close()
 })
 ```
 
-### Step 4: Run with Watt
+4. Prefer `create()` returning Express/Fastify/Koa or a supported HTTP server. Retain
+   standalone usage when needed. In-thread self-listening apps need a `close()` export
+   or `registerCloseCallback()`; custom commands own their child-process cleanup.
+5. Preserve original scripts/build transforms under clear names when introducing
+   `wattpm dev`, `build`, `start`. Point config at real source or production output.
+6. Document env names in `.env.example`, preserve `.env`, and ignore generated artifacts.
 
-```bash
-# Development mode (with auto-reload)
-npx wattpm dev
+For NestJS, review the dedicated capability's setup contract: production may bypass
+`main.ts`. For Koa, return the Koa instance rather than a raw callback. For generic
+HTTP, return the server without listening twice. See the individual framework guides.
 
-# Production mode
-npx wattpm start
-```
+## Authorized validation
 
----
+- Exercise development startup and a representative public endpoint.
+- Build, then exercise production startup; do not skip framework compilation.
+- Check DB/API integrations, internal mesh calls, auth, static assets, and SSR.
+- Test shutdown/cleanup and missing/empty required env values.
+- Probe a real health route, not an invented path. Watt does not rewrite conflicting ports.
+- Report remaining gaps; a CLI version check is not integration validation.
 
-## Entrypoint Patterns by Framework
+## Next steps
 
-### Express
-
-```javascript
-// server.js
-const express = require('express')
-
-async function create() {
-  const app = express()
-
-  app.use(express.json())
-
-  // Your middleware and routes
-  app.get('/health', (req, res) => res.json({ status: 'ok' }))
-
-  return app
-}
-
-module.exports = { create }
-```
-
-### Fastify
-
-```javascript
-// server.js
-const fastify = require('fastify')
-
-async function create() {
-  const app = fastify({ logger: true })
-
-  app.get('/health', async () => ({ status: 'ok' }))
-
-  // Your routes and plugins
-
-  return app
-}
-
-module.exports = { create }
-```
-
-### Koa
-
-```javascript
-// server.js
-const Koa = require('koa')
-
-async function create() {
-  const app = new Koa()
-
-  // Your middleware
-  app.use(async (ctx) => {
-    if (ctx.path === '/health') {
-      ctx.body = { status: 'ok' }
-    }
-  })
-
-  return app.callback()
-}
-
-module.exports = { create }
-```
-
-### NestJS
-
-```javascript
-// main.js
-const { NestFactory } = require('@nestjs/core')
-const { AppModule } = require('./app.module')
-
-async function create() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log']
-  })
-
-  await app.init()
-  return app.getHttpAdapter().getInstance()
-}
-
-module.exports = { create }
-```
-
-### Generic HTTP Server
-
-```javascript
-// server.js
-const http = require('http')
-
-async function create() {
-  const server = http.createServer((req, res) => {
-    if (req.url === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ status: 'ok' }))
-      return
-    }
-    // Your request handling
-  })
-
-  return server
-}
-
-module.exports = { create }
-```
-
----
-
-## Full watt.json Configuration
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "main": "src/server.js",
-    "commands": {
-      "development": "node --watch src/server.js",
-      "build": "npm run build",
-      "production": "node dist/server.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
----
-
-## Environment Setup
-
-Create `.env` file:
-
-```bash
-PLT_SERVER_HOSTNAME=0.0.0.0
-PLT_SERVER_LOGGER_LEVEL=info
-PORT=3000
-
-# Your app-specific variables
-DATABASE_URL=postgresql://localhost:5432/mydb
-API_KEY=your-api-key
-```
-
----
-
-## Troubleshooting
-
-### Application doesn't start
-
-1. **Check Node.js version**: Must be 22.19.0+
-   ```bash
-   node --version
-   ```
-
-2. **Verify entrypoint exports**: Must export `create` or `close`
-   ```bash
-   node -e "console.log(require('./index.js'))"
-   ```
-
-3. **Check for port conflicts**: Watt will auto-select next available port
-
-### Cannot connect to database
-
-1. Ensure database is running locally
-2. Check `DATABASE_URL` in `.env`
-3. Verify network access from local machine
-
-### TypeScript projects
-
-For TypeScript on Node.js 22.19+, you can run `.ts` entrypoints directly with native type stripping:
-
-```json
-{
-  "application": {
-    "main": "src/index.ts"
-  }
-}
-```
-
-If your project still requires transpilation (framework-specific transforms), keep using your build output.
-
----
-
-## Validation Checklist
-
-Before the POC session, verify:
-
-- [ ] `npm install` completes without errors
-- [ ] `npm install wattpm` succeeds (or use `npx wattpm`)
-- [ ] `watt.json` created with correct entrypoint
-- [ ] Entrypoint exports `create` or `close` function
-- [ ] `npx wattpm start` launches the application
-- [ ] Health endpoint responds: `curl http://localhost:3000/health`
-- [ ] Database connections work
-- [ ] API integrations function
-
----
-
-## Next Steps After Basic Integration
-
-1. **Add workers for performance**: See [performance.md](performance.md)
-2. **Set up multi-service architecture**: See [enterprise.md](enterprise.md)
-3. **Configure deployment**: See [deployment/docker.md](deployment/docker.md)
-4. **Add Kafka integration**: See [kafka.md](kafka.md)
+- [Workers, caching, and profiling](performance.md)
+- [Enterprise architecture](enterprise.md)
+- [Docker deployment](deployment/docker.md)
+- [Kafka integration](../../kafka/SKILL.md) — separate skill; do not rewrite it during Watt work.

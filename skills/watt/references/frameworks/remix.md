@@ -1,203 +1,66 @@
-# Remix Integration with Platformatic Watt
+# Classic Remix with Watt 4
 
-> Remix v7 was renamed to React Router. For React Router v7+ projects (a `react-router.config.*` file or `@react-router/dev` dependency), use [react-router.md](react-router.md) and `@platformatic/react-router` instead. Use this file for classic Remix v1/v2 projects (`remix.config.js`).
+React Router v7 is the successor to Remix v2. Use [react-router.md](react-router.md)
+for `react-router.config.*`/`@react-router/dev`; use `@platformatic/remix` for supported
+classic Remix apps detected through `remix.config.*` or `@remix-run/dev`.
 
-## Package
-```
-@platformatic/remix
-```
+With permission, install compatible `wattpm` and `@platformatic/remix`. ESM config:
 
-## Detection Files
-- `remix.config.js`
-- `remix.config.ts`
+```js
+import { createRemixConfig } from '@platformatic/remix'
 
-## watt.json Configuration
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/remix/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "remix vite:dev",
-      "build": "remix vite:build",
-      "production": "remix-serve ./build/server/index.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
+export default createRemixConfig({
+  server: { port: Number(process.env.PORT || 3000) }
+})
 ```
 
-### Remix v1 (Classic Compiler)
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/remix/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "remix dev",
-      "build": "remix build",
-      "production": "remix-serve build"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
+## Compiler and server adapter
 
-## Installation
+Preserve the installed Remix compiler and its supported capability contract:
 
-```bash
-npm install wattpm @platformatic/remix
-```
+| Existing pipeline | Typical build/output |
+| --- | --- |
+| Vite-based Remix v2 | `remix vite:build`, `build/server/index.js` |
+| Classic compiler | `remix build`, configured `build` server output |
 
-## Key Considerations
+Do not substitute commands solely from the presence of Vite. Keep custom Express
+adapter code, session/auth behavior, and asset serving. A deliberate generic Node
+integration can use `@platformatic/node` for an unsupported custom server, but report
+that choice rather than silently switching. Custom production commands choose their own
+listener and cleanup; Watt no longer writes `PORT` or overrides listener addresses.
 
-### Vite vs Classic Compiler
-Remix v2 uses Vite by default. Detect by checking:
-- `vite.config.ts` exists → Vite-based
-- Only `remix.config.js` → Classic compiler
+## Routes and deployment
 
-Adjust commands accordingly.
+Preserve loaders/actions, Vite plugin (`vitePlugin` from `@remix-run/dev`), and Classic
+compiler module format. Ship public assets plus complete server build. Build before
+Watt production startup; inspect `application.commands` only when defaults do not fit.
 
-### Server Adapter
-Watt works with the default `remix-serve`. For custom servers (Express adapter), adjust the production command.
+An application-owned `app/routes/health.tsx` loader can return a JSON health response.
+Probe the actual path through Gateway, accounting for any base prefix. Check WebSocket
+HMR and `.plt.local` allowed hosts for development instead of disabling Vite host checks.
 
-### Build Output
-- Vite: `./build/server/index.js`
-- Classic: `./build`
+## Sessions and database connections
 
-## Environment Variables
+Preserve session security (`httpOnly`, `secure` in production, `sameSite`, environment
+secrets). `createCookieSessionStorage` stores session data in cookies; it is **not** a
+database-backed session store. Use an actual server-side storage adapter when required.
+Do not use fallback production secrets.
 
-Remix uses `.env` files by default:
-```
-PORT=3000
-PLT_SERVER_HOSTNAME=0.0.0.0
-PLT_SERVER_LOGGER_LEVEL=info
-SESSION_SECRET=your-secret-here
-```
+Initialize Prisma/DB clients outside request handlers and avoid duplicate clients during
+development reload. Close pools through application lifecycle or `registerCloseCallback()`.
+Keep the project's existing module/type conventions for any development global store.
 
-Access in loaders/actions:
-```typescript
-export const loader = async () => {
-  const apiUrl = process.env.API_URL;
-  // ...
-};
-```
+## TypeScript and environment
 
-## Common Patterns
+Retain Remix builds/type checks; Node configuration stripping does not compile TSX or
+replace framework transforms. Use `process.env` in server loaders and expose only intended
+public values. Preserve `.env` handling and `SESSION_SECRET`, reading listener values
+explicitly in the capability or retained custom server.
 
-### With Vite (Remix v2+)
-```typescript
-// vite.config.ts
-import { vitePlugin as remix } from "@remix-run/dev";
-import { defineConfig } from "vite";
+## Common issues
 
-export default defineConfig({
-  plugins: [remix()],
-  server: {
-    port: parseInt(process.env.PORT || "3000"),
-    host: "0.0.0.0",
-  },
-});
-```
+- Build failure: inspect compiler version/plugin and dependencies before adding packages.
+- Static assets missing: inspect public paths, full build output, and Gateway rewriting.
+- Custom server not recognized: check the capability entrypoint contract and preserve auth/shutdown.
 
-### remix.config.js (Classic)
-```javascript
-/** @type {import('@remix-run/dev').AppConfig} */
-module.exports = {
-  ignoredRouteFiles: ["**/.*"],
-  serverModuleFormat: "cjs",
-};
-```
-
-### Health Check Route
-Create `app/routes/health.tsx`:
-```typescript
-import { json } from "@remix-run/node";
-
-export const loader = () => {
-  return json({ status: "ok" });
-};
-```
-
-## Deployment Considerations
-
-### Session Storage
-For production, use a database-backed session:
-```typescript
-import { createCookieSessionStorage } from "@remix-run/node";
-
-export const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: "__session",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    secrets: [process.env.SESSION_SECRET!],
-    sameSite: "lax",
-  },
-});
-```
-
-### Database Connections
-Initialize database connections outside request handlers:
-```typescript
-// app/db.server.ts
-import { PrismaClient } from "@prisma/client";
-
-let prisma: PrismaClient;
-
-if (process.env.NODE_ENV === "production") {
-  prisma = new PrismaClient();
-} else {
-  if (!global.__db__) {
-    global.__db__ = new PrismaClient();
-  }
-  prisma = global.__db__;
-}
-
-export { prisma };
-```
-
-## TypeScript
-
-Remix projects are TypeScript by default. Watt handles this natively with Node.js type stripping.
-
-## Common Issues
-
-### Build fails with Vite
-Ensure `vite.config.ts` is properly configured and all dependencies are installed:
-```bash
-npm install @remix-run/dev vite --save-dev
-```
-
-### Static assets not loading
-Check that `public/` directory is properly served. Watt handles static files automatically.
-
-### HMR not working
-Ensure WebSocket connections are allowed. Vite HMR should work out of the box with Watt.
-
-### Custom server not recognized
-If using a custom Express server, switch to `@platformatic/node` instead:
-```json
-{
-  "application": {
-    "commands": {
-      "production": "node server.js"
-    }
-  }
-}
-```
+See [Remix configuration](https://docs.platformatic.dev/docs/reference/remix/configuration).

@@ -1,371 +1,169 @@
-# Docker Deployment for Platformatic Watt
+# Docker deployment with Watt 4
 
-## Dockerfile (Multi-stage Build)
+Preserve an existing Dockerfile unless replacement is requested. Require Node.js
+**24.20.0+**, compatible capability dependencies, actual build output, and a startup
+that runs Watt. Do not default to a development server or dependency installation at startup.
 
-Create a `Dockerfile` in the project root:
+## npm single-application example
+
+This template assumes an npm lockfile, `build: wattpm build`, `start: wattpm start`,
+and configuration explicitly reading `HOST`/`PORT`. Select a supported exact Node image
+for the target architecture/libc; the example uses 24.20.0 Alpine.
 
 ```dockerfile
-# Build stage
-FROM node:22-alpine AS builder
-
+FROM node:24.20.0-alpine AS builder
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies (including devDependencies for build)
+COPY package.json package-lock.json ./
 RUN npm ci
-
-# Copy source code
 COPY . .
-
-# Build the application
 RUN npm run build
 
-# Production stage
-FROM node:22-alpine AS production
-
+FROM node:24.20.0-alpine AS production
 WORKDIR /app
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 watt
-
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/watt.json ./
-
-# Copy public assets if they exist
-COPY --from=builder /app/public ./public
-
-# Set ownership
-RUN chown -R watt:nodejs /app
-
-# Switch to non-root user
-USER watt
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV PLT_SERVER_HOSTNAME=0.0.0.0
-ENV PORT=3000
-
-# Expose port
+# Keep complete source/configuration/build assets; prune dependencies during image build.
+COPY --from=builder --chown=node:node /app ./
+RUN npm prune --omit=dev
+USER node
 EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
-# Start command
 CMD ["npm", "start"]
 ```
 
+Ensure `wattpm` and capability packages are **production dependencies**, not pruned
+development tools. Copying complete project output is conservative; narrow copies only
+after inventorying config imports, source entrypoints, assets, and framework runtime needs.
+Use `COPY --chown` and writable cache/temp directories. A build may read secrets but must
+not bake `.env`, tokens, or private credentials into image layers; use build secrets where needed.
+
+Native DB/PHP drivers must be built for the image architecture/libc. Use a Debian-based
+image when native dependencies do not support musl; never copy host `node_modules`.
+
+## Workspace/package managers
+
+Copy all workspace manifests before dependency installation and include each app's
+configuration/source/output/capability dependencies. Root npm `npm ci` requires declared
+workspaces and the correct lockfile. Preserve existing Yarn/pnpm/Bun conventions; use a
+supported pinned installer and frozen lockfile. Do not assume Corepack or generate a
+second lockfile. Review production pruning and hoisting before narrowing copies.
+
+## Framework output
+
+- Next.js: keep required `.next`, `public`, configuration, manifests, Watt and capability.
+  For standalone deployments, set Next `output: 'standalone'` and capability
+  `next.standalone: true`, inspect the supported pack command, and retain Watt startup.
+  `CMD ["node", "server.js"]` by itself is framework-only hosting, not this Watt deployment.
+- Nuxt/Nitro: copy complete `.output`, including server, public assets, and bundled deps.
+- React Router/Remix/TanStack: copy the actual server/client output and adapter dependencies.
+- Astro: include both server and client output matching its Node adapter.
+- NestJS: preserve compiled app module/shared setup, assets, and `@platformatic/nest`.
+  Starting only `dist/main.js` bypasses the dedicated Watt capability.
+- Generic Node: include its actual source or compiled `main`; do not assume `dist` exists.
+
+Build before production startup; retain framework original scripts without recursive
+`wattpm build` invocation through custom command settings.
+
 ## .dockerignore
 
-Create `.dockerignore`:
-
-```
-# Dependencies
+```text
 node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build output (rebuilt in container)
-dist
-build
-.next
-.nuxt
-
-# Git
 .git
-.gitignore
-
-# Environment (secrets should be injected at runtime)
 .env
 .env.*
 !.env.example
-
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-
-# Documentation
-*.md
-!README.md
-
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Testing
+.next
+.nuxt
+.output
+dist
+build
 coverage
-.nyc_output
-__tests__
-*.test.*
-*.spec.*
-
-# Misc
-.DS_Store
 *.log
+pprof-*.pb
+*.heapsnapshot
+flame-*.html
 tmp
-temp
 ```
 
-## Build Commands
+Adjust these exclusions to actual profiling paths and build output intentionally supplied
+instead of rebuilt. Keep package manifests/lockfiles and
+configuration imports. Add IDE/OS artifacts as appropriate.
 
-```bash
-# Build image
-docker build -t my-watt-app:latest .
+## Health checks
 
-# Build with specific tag
-docker build -t my-watt-app:v1.0.0 .
+No universal `/health` route exists. Probe an implemented public app route, or configure
+the runtime's documented private readiness/liveness listener explicitly. Choose startup
+period and timeouts for the real application. For an implemented `/health` on 3000:
 
-# Build with build args
-docker build \
-  --build-arg NODE_ENV=production \
-  -t my-watt-app:latest .
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 ```
 
-## Run Commands
+The snippet does not create the endpoint. Framework `.json` routes or Gateway prefixes
+may change its path. Keep metrics/control ports private and protected.
 
-```bash
-# Run container
-docker run -d \
-  -p 3000:3000 \
-  -e PLT_SERVER_LOGGER_LEVEL=info \
-  --name my-watt-app \
-  my-watt-app:latest
-
-# Run with environment file
-docker run -d \
-  -p 3000:3000 \
-  --env-file .env.production \
-  --name my-watt-app \
-  my-watt-app:latest
-
-# Run with memory limits
-docker run -d \
-  -p 3000:3000 \
-  --memory=512m \
-  --cpus=1 \
-  --name my-watt-app \
-  my-watt-app:latest
-
-# View logs
-docker logs -f my-watt-app
-
-# Stop container
-docker stop my-watt-app
-
-# Remove container
-docker rm my-watt-app
-```
-
-## Docker Compose (Development)
-
-Create `docker-compose.yml`:
+## Compose development
 
 ```yaml
-version: '3.8'
-
 services:
   app:
     build:
       context: .
-      target: builder  # Use builder stage for dev
+      target: builder
     ports:
-      - "3000:3000"
+      - '127.0.0.1:3000:3000'
     environment:
-      - NODE_ENV=development
-      - PLT_SERVER_LOGGER_LEVEL=debug
-      - PLT_SERVER_HOSTNAME=0.0.0.0
-      - PORT=3000
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: '3000'
+      LOG_LEVEL: debug
     volumes:
       - .:/app
-      - /app/node_modules  # Preserve container's node_modules
+      - /app/node_modules
     command: npm run dev
-    restart: unless-stopped
 ```
 
-## Docker Compose (Production)
+This volume layout is single-app only; workspaces may need additional dependency/output
+mount handling. Preserve container dependencies when bind-mounting source.
 
-Create `docker-compose.prod.yml`:
+## Compose production and infrastructure
 
 ```yaml
-version: '3.8'
-
 services:
   app:
     build:
       context: .
       target: production
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
-      - NODE_ENV=production
-      - PLT_SERVER_LOGGER_LEVEL=info
-      - PLT_SERVER_HOSTNAME=0.0.0.0
-      - PORT=3000
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-  # Optional: Nginx reverse proxy
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-    depends_on:
-      - app
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+      LOG_LEVEL: info
     restart: unless-stopped
 ```
 
-## Docker Compose with Database
+Add only requested DB/cache services. For PostgreSQL, use a supported pinned image,
+persistent data volume, and `pg_isready` health check; `depends_on: condition:
+service_healthy` does not replace application connection retries. Redis/Valkey need
+persistent/auth configuration according to the requested cache semantics. Credentials
+belong in untracked env files/secret stores, not copied production templates.
+An optional Nginx reverse proxy can terminate TLS with read-only config/certificate mounts.
 
-```yaml
-version: '3.8'
+## Build/run and registry commands
 
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://user:password@db:5432/myapp
-      - PLT_SERVER_HOSTNAME=0.0.0.0
-      - PORT=3000
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+Provide commands, but execute only with authorization:
 
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=myapp
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # Optional: Redis for caching/sessions
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
+```sh
+docker build -t my-watt-app:v1.0.0 .
+docker run -d -p 3000:3000 --env-file .env.production --name my-watt-app my-watt-app:v1.0.0
+docker logs -f my-watt-app
+docker stop my-watt-app
+docker tag my-watt-app:v1.0.0 registry.example.com/my-watt-app:v1.0.0
+docker push registry.example.com/my-watt-app:v1.0.0
 ```
 
-## Production Considerations
-
-### Security
-- Use specific Node.js version tags (not `latest`)
-- Run as non-root user
-- Don't include secrets in image
-- Scan images for vulnerabilities: `docker scout cve my-watt-app`
-
-### Performance
-- Set memory limits: `--memory=512m`
-- Set CPU limits: `--cpus=1`
-- Use multi-stage builds to reduce image size
-- Leverage build cache
-
-### Reliability
-- Configure restart policy: `--restart=unless-stopped`
-- Add health checks
-- Use proper logging driver
-
-### Image Registry
-
-```bash
-# Tag for registry
-docker tag my-watt-app:latest registry.example.com/my-watt-app:latest
-
-# Push to registry
-docker push registry.example.com/my-watt-app:latest
-
-# Pull from registry
-docker pull registry.example.com/my-watt-app:latest
-```
-
-## Framework-Specific Dockerfiles
-
-### Next.js
-```dockerfile
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:22-alpine AS production
-WORKDIR /app
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/watt.json ./
-USER nextjs
-ENV NODE_ENV=production PORT=3000
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
-### NestJS
-```dockerfile
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:22-alpine AS production
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/watt.json ./
-ENV NODE_ENV=production PORT=3000
-EXPOSE 3000
-CMD ["node", "dist/main.js"]
-```
+Use actual image names, approved env files, measured CPU/memory limits, non-root startup,
+vulnerability scanning, and restart policies. Push/pull/provisioning are separate authorized
+operations. Validate public routing, private mesh, assets, secrets exclusion, and termination.

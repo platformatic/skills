@@ -1,323 +1,204 @@
-# Observability in Platformatic Watt
+# Observability in Watt 4
 
-Comprehensive guide for logging, tracing, and metrics in Watt applications.
+Keep runtime-wide options on the runtime root and capability-specific settings on the
+application. Inspect installed schemas and backend requirements. Do not dump configuration
+or environment values containing secrets, and protect metrics/control/collector ports.
 
----
+## Pino logging
 
-## Custom Logging with Pino
+Watt uses Pino structured logging. Merge these options into the existing ESM root config,
+preserving its topology:
 
-Watt uses [Pino](https://github.com/pinojs/pino) for high-performance structured logging.
+```js
+import { createWattConfig } from 'wattpm'
 
-### Basic Configuration
-
-```json
-{
-  "logger": {
-    "level": "{PLT_SERVER_LOGGER_LEVEL}",
-    "timestamp": "isoTime",
-    "base": {
-      "service": "my-app",
-      "version": "1.0.0"
-    }
-  }
-}
-```
-
-### Log Levels
-
-Standard levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `silent`
-
-**Custom levels:**
-```json
-{
-  "logger": {
-    "customLevels": {
-      "verbose": 15,
-      "notice": 35
-    }
-  }
-}
-```
-
-### File Transport
-
-Write logs to files:
-
-```json
-{
-  "logger": {
-    "transport": {
-      "targets": [{
-        "target": "pino/file",
-        "options": {
-          "destination": "{LOG_DIR}/app.log",
-          "mkdir": true
-        }
-      }]
-    }
-  }
-}
-```
-
-### Log Redaction
-
-Automatically hide sensitive data:
-
-```json
-{
-  "logger": {
-    "redact": {
-      "paths": [
-        "req.headers.authorization",
-        "req.headers.cookie",
-        "password",
-        "apiKey",
-        "token",
-        "*.password",
-        "*.secret"
+export default createWattConfig({
+  applications: [{ id: 'api', path: './applications/api' }],
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    timestamp: 'isoTime',
+    base: { service: 'my-app', version: '1.0.0' },
+    redact: {
+      paths: [
+        'req.headers.authorization', 'req.headers.cookie',
+        'password', 'apiKey', 'token', '*.password', '*.secret'
       ],
-      "censor": "[REDACTED]"
+      censor: '[REDACTED]'
     }
   }
-}
+})
 ```
 
-### Custom Formatters
+Levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `silent`. Preserve custom
+levels (for example `{ verbose: 15, notice: 35 }`) when supported by the installed logger.
 
-Create `formatters.js`:
-```javascript
-module.exports = {
-  level(label, number) {
+### Custom formatters
+
+The installed logger schema supports `formatters: { path: './formatters.js' }`. An ESM
+formatter module can export:
+
+```js
+export default {
+  level (label) {
     return { level: label.toUpperCase() }
   },
-  bindings(bindings) {
-    return {
-      pid: bindings.pid,
-      host: bindings.hostname,
-      service: bindings.service
-    }
-  },
-  log(object) {
-    return object
+  bindings (bindings) {
+    return { pid: bindings.pid, host: bindings.hostname, service: bindings.service }
   }
 }
 ```
 
-Reference in config:
-```json
-{
-  "logger": {
-    "formatters": {
-      "path": "./formatters.js"
-    }
+Merge the formatter path into the logger configuration and ship the module with the
+image. Verify the runtime's supported formatter hooks rather than assuming every generic
+Pino option is forwarded. Multi-transport logging can impose restrictions on level formatting.
+
+### Transports
+
+Configure transports only after checking installed packages and runtime compatibility:
+
+```js
+const logger = {
+  transport: {
+    targets: [
+      { target: 'pino-pretty', level: 'info', options: { colorize: true } },
+      {
+        target: 'pino/file',
+        level: 'warn',
+        options: { destination: `${process.env.LOG_DIR || './logs'}/error.log`, mkdir: true }
+      },
+      {
+        target: 'pino-opentelemetry-transport',
+        level: 'info',
+        options: { loggerName: 'my-app', serviceVersion: '1.0.0' }
+      },
+      {
+        target: 'pino-loki',
+        level: 'info',
+        options: { host: process.env.LOKI_URL, labels: { app: 'my-app' } }
+      }
+    ]
   }
 }
 ```
 
-### Programmatic Usage
+This is an option fragment: select only wanted transports and pass it to the config.
+Require configured backend URLs. `pino-pretty` is primarily for development; file
+transports need writable storage/rotation. Container production often uses stdout.
+Install transports only with permission; keep generated logs out of version control.
 
-```javascript
-// Access the global logger
-const logger = globalThis.platformatic.logger
+### Application logger
 
+Use typed globals, not removed `globalThis.platformatic`:
+
+```js
+import { getLogger } from '@platformatic/globals'
+
+const logger = getLogger()
 logger.info('Application started')
-logger.debug({ userId: 123 }, 'User login')
-logger.error({ err }, 'Request failed')
-
-// Child logger with context
-const childLogger = logger.child({
-  service: 'payment-api',
-  requestId: req.id
-})
-childLogger.info('Processing payment')
+const child = logger.child({ service: 'payment-api' })
+child.info('Processing payment')
 ```
 
----
+Choose a fallback logger explicitly for code that must run outside Watt. Initialize
+resources before registering callbacks that can access them.
 
-## OpenTelemetry Tracing
+## OpenTelemetry tracing
 
-Enable distributed tracing across your microservices.
+Watt 4 renames config `telemetry` to **`tracing`** and package to `@platformatic/tracing`.
+An exported symbol may still be named `telemetry`; inspect package exports before renaming imports.
+An OTLP option fragment, to merge into the correct root/capability configuration:
 
-### Basic Configuration
-
-```json
-{
-  "telemetry": {
-    "serviceName": "my-service",
-    "version": "1.0.0",
-    "exporter": {
-      "type": "otlp",
-      "options": {
-        "url": "http://localhost:4318/v1/traces"
-      }
+```js
+const tracing = {
+  applicationName: 'my-service',
+  version: '1.0.0',
+  exporter: {
+    type: 'otlp',
+    options: {
+      url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://127.0.0.1:4318'}/v1/traces`
     }
   }
 }
 ```
 
-### Exporter Types
+Avoid duplicating `/v1/traces` if the supplied env variable is already a full trace URL.
+The examined tracing schema requires `applicationName`, not the old example's `serviceName`.
+OTLP HTTP commonly uses 4318; gRPC uses 4317 and requires the matching exporter contract.
+Do not assume an HTTP exporter accepts a gRPC endpoint. Inspect supported exporter types;
+legacy Jaeger Thrift/Zipkin examples are not proof of support in the installed release.
 
-| Type | Description | Default Endpoint |
-|------|-------------|------------------|
-| `otlp` | OpenTelemetry Protocol (recommended) | `http://localhost:4318/v1/traces` |
-| `zipkin` | Zipkin format | `http://localhost:9411/api/v2/spans` |
-| `jaeger` | Jaeger Thrift | `http://localhost:14268/api/traces` |
+Environment conventions to preserve where applicable: `OTEL_SERVICE_NAME`,
+`OTEL_SERVICE_VERSION`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`,
+and `OTEL_RESOURCE_ATTRIBUTES`. Explicit config/env precedence depends on the integration.
+Keep auth headers out of source and command history.
 
-### OTLP Endpoints
+### OpenTelemetry logs and correlation
 
-- **HTTP**: `http://localhost:4318/v1/traces`
-- **gRPC**: `http://localhost:4317`
+`pino-opentelemetry-transport` can use `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and resource
+attributes. Verify transport options/version and ensure a collector logs pipeline exists.
 
-### Environment Variables
+`@opentelemetry/instrumentation-pino` can correlate logs with active traces:
 
-```bash
-# Service identification
-OTEL_SERVICE_NAME=my-service
-OTEL_SERVICE_VERSION=1.0.0
+```js
+import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 
-# Exporter configuration
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
-
-# Resource attributes
-OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.namespace=myapp
-```
-
----
-
-## OpenTelemetry Logs
-
-Send logs to OpenTelemetry collectors using `pino-opentelemetry-transport`.
-
-### Installation
-
-```bash
-npm install pino-opentelemetry-transport
-```
-
-### Configuration
-
-```json
-{
-  "logger": {
-    "transport": {
-      "target": "pino-opentelemetry-transport",
-      "options": {
-        "loggerName": "my-app",
-        "serviceVersion": "1.0.0",
-        "resourceAttributes": {
-          "deployment.environment": "production"
-        }
-      }
-    }
-  }
-}
-```
-
-### Environment Variables
-
-```bash
-OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
-```
-
----
-
-## Log-Trace Correlation
-
-Automatically inject trace context into logs using `@opentelemetry/instrumentation-pino`.
-
-### Installation
-
-```bash
-npm install @opentelemetry/instrumentation-pino
-```
-
-### Setup
-
-```javascript
-const { PinoInstrumentation } = require('@opentelemetry/instrumentation-pino')
-
-const pinoInstrumentation = new PinoInstrumentation({
-  logKeys: {
-    traceId: 'trace_id',
-    spanId: 'span_id',
-    traceFlags: 'trace_flags'
-  }
+const instrumentation = new PinoInstrumentation({
+  logKeys: { traceId: 'trace_id', spanId: 'span_id', traceFlags: 'trace_flags' }
 })
 ```
 
-### Result
+Construction alone does not register instrumentation. Integrate it through the installed
+tracing SDK's supported registration path, before Pino loads, and verify logs inside a span.
+Avoid duplicate SDKs/instrumentation when Watt already owns tracing.
 
-Logs within a traced request automatically include:
-```json
-{
-  "level": "info",
-  "msg": "Processing request",
-  "trace_id": "abc123...",
-  "span_id": "def456...",
-  "trace_flags": "01"
+## Metrics
+
+Metrics are not automatically enabled on port 9090. Configure them deliberately:
+
+```js
+const metrics = {
+  port: Number(process.env.METRICS_PORT || 9090),
+  hostname: '127.0.0.1'
 }
 ```
 
----
+Merge into the existing root. In a private container network, `0.0.0.0` may be needed
+for scraping; do not publish it publicly. The examined schema accepts `auth` as a
+username/password object, **not `auth: false`**. Use secret references when enabling it.
+Verify actual metric names/labels in the selected runtime and capability: generic
+`http_requests_total`, cache-hit, and worker-utilization names are not guaranteed.
 
-## Prometheus Metrics
+### Custom application metrics
 
-Expose metrics for Prometheus scraping.
+Use the registry/client integrated by the application or installed Watt metrics API;
+do not assume an unrelated `prom-client` default registry is automatically aggregated.
+A metric fragment using the chosen client:
 
-### Configuration
-
-```json
-{
-  "metrics": {
-    "port": 9090,
-    "hostname": "0.0.0.0",
-    "auth": false
-  }
-}
-```
-
-### Default Metrics
-
-Watt automatically exposes:
-- `nodejs_*` - Node.js runtime metrics
-- `http_request_duration_seconds` - HTTP request latency
-- `http_requests_total` - HTTP request count
-
-### Custom Metrics
-
-```javascript
-const client = require('prom-client')
-
-// Counter
+```js
 const requestCounter = new client.Counter({
   name: 'api_requests_total',
-  help: 'Total API requests',
-  labelNames: ['method', 'endpoint', 'status']
+  help: 'Total API requests.',
+  labelNames: ['method', 'route', 'status']
 })
-
-// Histogram
-const responseTime = new client.Histogram({
+const duration = new client.Histogram({
   name: 'api_response_time_seconds',
-  help: 'API response time',
-  labelNames: ['method', 'endpoint'],
+  help: 'API response time in seconds.',
+  labelNames: ['method', 'route'],
   buckets: [0.1, 0.5, 1, 2, 5]
 })
-
-// Gauge
-const activeConnections = new client.Gauge({
+const connections = new client.Gauge({
   name: 'active_connections',
-  help: 'Number of active connections'
+  help: 'Current active connections.'
 })
-
-// Usage
-requestCounter.inc({ method: 'GET', endpoint: '/api/users', status: 200 })
-responseTime.observe({ method: 'GET', endpoint: '/api/users' }, 0.234)
-activeConnections.set(42)
 ```
 
-### Kubernetes ServiceMonitor
+Use bounded route labels, not user IDs/raw URLs. Avoid duplicate metric registration
+on reload. Verify both application and aggregated scrape output.
+
+### Kubernetes scraping
+
+Expose a private, named `metrics` Service port selecting the correct pod labels, then
+use a ServiceMonitor whose selector matches that **Service**, not a mismatched example:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -327,177 +208,42 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: watt-app
+      app.kubernetes.io/name: watt-app
   endpoints:
     - port: metrics
       interval: 15s
       path: /metrics
 ```
 
----
+The Prometheus operator/CRD must exist. Set authentication/TLS and network policy as
+required. Confirm the actual endpoint and namespace selectors. Health probes may use
+a separately configured runtime health server; do not expose it through the public app.
 
-## Backend-Specific Configuration
+## Backend-specific integration
 
-### Jaeger
+| Backend | Guidance |
+| --- | --- |
+| Jaeger | Use a supported Jaeger deployment with OTLP HTTP/gRPC receiver; point traces at that collector, not an obsolete Thrift exporter. Keep UI/collector ports private. |
+| Datadog | Enable Agent `otlp_config.receiver.protocols.http`/`grpc` on private addresses. Preserve `DD_SERVICE`, `DD_ENV`, `DD_VERSION` mapping and verify resource attributes. |
+| New Relic | Use the supported OTLP ingest endpoint with env-provided API-key headers; verify protocol, region, and `/v1/traces` path. |
+| Grafana Tempo/Loki/Prometheus | Tempo receives traces; Loki receives logs via a configured Pino transport/collector; Prometheus scrapes the private runtime metrics endpoint. Grafana is visualization, not an exporter. |
+| AWS CloudWatch/X-Ray | Use an ADOT collector with OTLP receivers and the appropriate exporters/IAM credentials. Point Watt to the collector, not an assumed direct ingest URL. |
+| GCP Cloud Trace | Use a supported collector exporter and service-account/workload identity. Cloud Trace API URLs are not automatically OTLP ingest endpoints. |
+| Azure Monitor | Use supported collector/exporter integration and `APPLICATIONINSIGHTS_CONNECTION_STRING`; merely installing an exporter does not register it. |
 
-**Docker Compose:**
-```yaml
-services:
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686"  # UI
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-```
-
-**watt.json:**
-```json
-{
-  "telemetry": {
-    "serviceName": "my-service",
-    "exporter": {
-      "type": "otlp",
-      "options": {
-        "url": "http://jaeger:4318/v1/traces"
-      }
-    }
-  }
-}
-```
-
-### Datadog
-
-**Datadog Agent configuration:**
-```yaml
-# datadog.yaml
-otlp_config:
-  receiver:
-    protocols:
-      http:
-        endpoint: 0.0.0.0:4318
-      grpc:
-        endpoint: 0.0.0.0:4317
-```
-
-**watt.json:**
-```json
-{
-  "telemetry": {
-    "serviceName": "my-service",
-    "exporter": {
-      "type": "otlp",
-      "options": {
-        "url": "http://datadog-agent:4318/v1/traces"
-      }
-    }
-  }
-}
-```
-
-**Environment:**
-```bash
-DD_SERVICE=my-service
-DD_ENV=production
-DD_VERSION=1.0.0
-```
-
-### New Relic
-
-**Environment variables:**
-```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.nr-data.net
-OTEL_EXPORTER_OTLP_HEADERS=api-key=YOUR_NEW_RELIC_LICENSE_KEY
-OTEL_SERVICE_NAME=my-service
-```
-
-**watt.json:**
-```json
-{
-  "telemetry": {
-    "serviceName": "my-service",
-    "exporter": {
-      "type": "otlp",
-      "options": {
-        "url": "{OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces",
-        "headers": {
-          "api-key": "{NEW_RELIC_LICENSE_KEY}"
-        }
-      }
-    }
-  }
-}
-```
-
-### Grafana Stack (Tempo + Loki + Prometheus)
-
-**Docker Compose:**
-```yaml
-services:
-  tempo:
-    image: grafana/tempo:latest
-    command: ["-config.file=/etc/tempo.yaml"]
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-
-  loki:
-    image: grafana/loki:latest
-    ports:
-      - "3100:3100"
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-```
-
-**Logs to Loki (pino-loki):**
-```bash
-npm install pino-loki
-```
-
-```json
-{
-  "logger": {
-    "transport": {
-      "target": "pino-loki",
-      "options": {
-        "host": "http://loki:3100",
-        "labels": { "app": "my-service" }
-      }
-    }
-  }
-}
-```
-
-### AWS CloudWatch / X-Ray
-
-**Using AWS Distro for OpenTelemetry (ADOT):**
+### ADOT collector fragment
 
 ```yaml
-# ADOT collector config
 receivers:
   otlp:
     protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
-
+      grpc:
+        endpoint: 0.0.0.0:4317
 exporters:
   awsxray:
     region: us-east-1
-
 service:
   pipelines:
     traces:
@@ -505,145 +251,34 @@ service:
       exporters: [awsxray]
 ```
 
-**watt.json:**
-```json
-{
-  "telemetry": {
-    "serviceName": "my-service",
-    "exporter": {
-      "type": "otlp",
-      "options": {
-        "url": "http://adot-collector:4318/v1/traces"
-      }
-    }
-  }
-}
-```
+Validate against the installed collector distribution; exporter availability and IAM
+requirements vary. Do not provision cloud resources without permission.
 
-### GCP Cloud Trace
+### Local observability stack
 
-**Environment:**
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-OTEL_EXPORTER_OTLP_ENDPOINT=https://cloudtrace.googleapis.com
-```
+Keep Compose services for app, collector/Jaeger, Prometheus, and Grafana on a private
+network, with explicitly chosen supported image tags. Mount actual collector/Prometheus
+configs. Avoid conflicting app/Grafana ports and do not default Grafana to anonymous Admin.
+For local-only UIs, bind published ports to `127.0.0.1`.
 
-Or use the OpenTelemetry Collector with GCP exporter.
+`prometheus.yml` fragment, when the app exposes a private 9090 listener:
 
-### Azure Monitor
-
-**Installation:**
-```bash
-npm install @azure/monitor-opentelemetry-exporter
-```
-
-**Environment:**
-```bash
-APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=xxx;IngestionEndpoint=https://xxx.in.applicationinsights.azure.com/
-```
-
----
-
-## Multiple Transports
-
-Send logs to multiple destinations:
-
-```json
-{
-  "logger": {
-    "level": "info",
-    "transport": {
-      "targets": [
-        {
-          "target": "pino-pretty",
-          "level": "info",
-          "options": { "colorize": true }
-        },
-        {
-          "target": "pino/file",
-          "level": "warn",
-          "options": { "destination": "./logs/error.log" }
-        },
-        {
-          "target": "pino-opentelemetry-transport",
-          "level": "info",
-          "options": { "loggerName": "my-app" }
-        },
-        {
-          "target": "pino-loki",
-          "level": "info",
-          "options": { "host": "http://loki:3100" }
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Full Observability Stack (Docker Compose)
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-      - "9090:9090"  # Metrics
-    environment:
-      - PLT_SERVER_HOSTNAME=0.0.0.0
-      - PORT=3000
-      - PLT_SERVER_LOGGER_LEVEL=info
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
-    depends_on:
-      - jaeger
-      - prometheus
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-```
-
-**prometheus.yml:**
 ```yaml
 global:
   scrape_interval: 15s
-
 scrape_configs:
-  - job_name: 'watt-app'
+  - job_name: watt-app
     static_configs:
       - targets: ['app:9090']
 ```
 
----
+Verify traces, correlated logs, metric labels, secret redaction, and protected endpoints
+with permission; installing packages alone is not observability validation.
 
 ## Resources
 
-- [Platformatic Logging Guide](https://docs.platformatic.dev/docs/guides/logging)
-- [Distributed Tracing with Platformatic](https://blog.platformatic.dev/distributed-tracing-with-platformatic-and-open-telemetry)
-- [Pino Documentation](https://getpino.io/)
+- [Platformatic logging](https://docs.platformatic.dev/docs/guides/logging)
+- [Runtime configuration](https://docs.platformatic.dev/docs/reference/runtime/configuration)
+- [Pino](https://getpino.io/)
 - [OpenTelemetry JS](https://opentelemetry.io/docs/languages/js/)
-- [pino-opentelemetry-transport](https://github.com/pinojs/pino-opentelemetry-transport)
+- [Pino OTLP transport](https://github.com/pinojs/pino-opentelemetry-transport)

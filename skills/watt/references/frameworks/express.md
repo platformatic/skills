@@ -1,192 +1,83 @@
-# Express Integration with Platformatic Watt
+# Express with Watt 4
 
-## Package
-```
-@platformatic/node
-```
+Detect `express` in dependencies and the actual entrypoint (`package.json.main`,
+`src/index.*`, `src/app.*`, `index.*`, or `server.*`). Install compatible `wattpm` and
+`@platformatic/node` only with authorization, preserving the package manager.
 
-## Detection
-- `package.json` contains `express` in dependencies
-- No framework-specific config file
+## Managed factory
 
-## watt.json Configuration
+Prefer an ESM `create()` factory; preserve routes, middleware, authentication, and errors:
 
-### JavaScript Project
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.js",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.js"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
+```js
+import express from 'express'
+import cors from 'cors'
+import helmet from 'helmet'
 
-### TypeScript Project
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/node/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "node --watch src/index.ts",
-      "build": "echo 'No build step required'",
-      "production": "node src/index.ts"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-## Installation
-
-```bash
-npm install wattpm
-```
-
-For TypeScript, no additional runtime tooling is required on Node.js 22+.
-If you use ESM imports in `.ts` files, set `"type": "module"` in `package.json` and use `import type` for type-only imports.
-
-## Key Considerations
-
-### Entry Point Detection
-Look for the main file in order:
-1. `package.json` `main` field
-2. `src/index.js` or `src/index.ts`
-3. `src/app.js` or `src/app.ts`
-4. `index.js` or `index.ts`
-5. `app.js` or `app.ts`
-6. `server.js` or `server.ts`
-
-### Port Binding
-Express apps MUST read port from environment:
-```javascript
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
-});
-```
-
-**Important**: Bind to `0.0.0.0`, not `localhost` or `127.0.0.1`.
-
-### Process Manager Migration
-Remove any process manager (PM2, forever, nodemon for production) - Watt handles process management.
-
-Update package.json:
-```json
-{
-  "scripts": {
-    "dev": "wattpm dev",
-    "build": "wattpm build",
-    "start": "wattpm start"
-  }
-}
-```
-
-## Health Check Endpoint
-
-Add a health check endpoint for Watt monitoring:
-```javascript
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-```
-
-## Common Patterns
-
-### With Middleware Stack
-```javascript
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-
-const app = express();
-
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-
-// Routes
-app.use('/api', apiRoutes);
-
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0');
-```
-
-### With TypeScript
-```typescript
-import express from 'express';
-import type { Application } from 'express';
-
-const app: Application = express();
-const port = process.env.PORT || 3000;
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
-});
-```
-
-## Environment Variables
-
-Standard Express environment:
-- `NODE_ENV` - development/production
-- `PORT` - Server port (provided by Watt)
-
-Watt additions:
-- `PLT_SERVER_HOSTNAME` - Bind address
-- `PLT_SERVER_LOGGER_LEVEL` - Log level
-
-## Common Issues
-
-### Cannot bind to port
-Ensure you're binding to `0.0.0.0` not `localhost`.
-
-### App crashes on startup
-Check that all environment variables are available. Use `.env` file for local development.
-
-### Graceful shutdown
-If your `@platformatic/node` entrypoint returns an app from `create()`, Watt owns the listening socket and you usually do not need extra shutdown code. If your entrypoint starts listening by itself, export a `close()` function so Watt can stop it cleanly:
-```javascript
-async function close() {
-  return new Promise((resolve) => {
-    server.close(resolve)
+export function create () {
+  const app = express()
+  app.use(helmet())
+  app.use(cors())
+  app.use(express.json())
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok' })
   })
+  return app
 }
-
-module.exports = { close }
 ```
 
-If you need to react to Watt shutdown events, use `@platformatic/globals` instead of typing `globalThis.platformatic` manually:
-```javascript
-const { getGlobal } = require('@platformatic/globals')
+`watt.config.js` in an ESM project:
 
-getGlobal()?.events?.on('close', () => {
-  void close()
+```js
+import { createNodeConfig } from '@platformatic/node'
+
+export default createNodeConfig({
+  main: './src/index.js',
+  server: {
+    hostname: process.env.HOST || '127.0.0.1',
+    port: Number(process.env.PORT || 3000)
+  }
 })
 ```
+
+Match `main` to the actual factory path. For TS, native stripping is limited to erasable
+syntax; keep compilation for framework transforms/aliases and point at build output.
+The managed factory must not also call `listen()`.
+
+## Existing self-listening apps
+
+Preserve standalone usage when needed. The app chooses its own listener; Watt does not
+write `PORT` or move it to the next free port. Bind public containers to `0.0.0.0`, not
+every internal application. An in-thread self-listening entrypoint can export:
+
+```js
+export async function close () {
+  await new Promise((resolve, reject) => {
+    server.close(error => {
+      if (error) {
+        reject(error)
+      } else {
+        resolve()
+      }
+    })
+  })
+}
+```
+
+Here `server` is the application's existing listener. For extra asynchronous cleanup,
+use `registerCloseCallback()` from `@platformatic/globals`, not legacy close events.
+Custom-command child processes must register their own cleanup; Watt does not invoke
+their exported factories/`close()` automatically. Do not register the same cleanup twice.
+
+## Scripts and health
+
+Use `wattpm dev`, `build`, `start`; preserve original scripts under clear names to avoid
+recursive custom build commands. Remove PM2/forever only within the requested integration
+scope. `/health` above is an application route, not an automatic Watt endpoint. Use it
+for probes only after verifying the route through the deployed listener.
+
+## Common issues
+
+- Startup failure: inspect actual env requirements and configuration mode without dumping secrets.
+- Container unreachable: confirm the public listener's hostname/port, not just `PORT` existence.
+- Address in use: identify the owner before stopping anything; choose a new explicit port.
+- Shutdown warnings: close servers, DB pools, timers, and resources using the correct execution mode.
