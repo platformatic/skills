@@ -10,7 +10,7 @@ This is an **Agent Skill** following the [Agent Skills open standard](https://ag
 
 The `skills/` directory is portable across any skills-compatible agent (Claude Code, Cursor, GitHub Copilot, Gemini CLI, etc.). The `agents/`, `commands/`, and `.claude-plugin/` directories are Claude Code-specific extensions that add slash commands and sub-agents.
 
-The skill gives agents the knowledge to help users integrate [Platformatic Watt](https://docs.platformatic.dev/docs/Overview) into Node.js and PHP projects — framework detection, `watt.json` generation, dependency installation, deployment configs, and more.
+The Watt skill delegates to the project's locally installed `wattpm skill` for release-matched integration, configuration, and deployment guidance.
 
 ## Testing
 
@@ -31,11 +31,7 @@ claude --plugin-dir /path/to/watt-skill
 The plugin exposes three component types, each a Markdown file with YAML frontmatter:
 
 ### Skills (`skills/watt/`)
-- **`SKILL.md`** — Main entrypoint. Contains a command router that maps user input (e.g. `init`, `deploy docker`) to inline workflows. Workflows read reference files on demand — they never bulk-load all references.
-- **`references/`** — Knowledge base loaded lazily by workflows:
-  - `frameworks/` — Per-framework watt.json configs (nextjs, nuxt, react-router, tanstack, vite, express, fastify, koa, remix, astro, nestjs, php)
-  - `deployment/` — Docker, Kubernetes, cloud deployment guides
-  - Topic files: enterprise, scheduler, cms-integration, observability, performance, poc-checklist, troubleshooting, wattpm-cli
+- **`SKILL.md`** — Version-independent discovery entrypoint. Locates the project's installed `wattpm`, loads `wattpm skill`, and retrieves linked references through the same CLI. Version-specific workflows and references are maintained in `platformatic/platformatic` and bundled in `wattpm`, not copied here.
 
 ### Skills (`skills/kafka/`)
 - **`SKILL.md`** — Kafka integration skill. Routes kafka-related commands (hooks, producer, consumer, monitoring, tracing, migrations) to workflows that reference the kafka knowledge base.
@@ -76,31 +72,20 @@ Read-only agents should only declare: `allowed-tools: Read, Glob, Grep`
 
 ### Adding a New Framework
 
-1. Create `skills/watt/references/frameworks/{framework}.md` with: package name, detection method, watt.json config, installation steps, key considerations, common issues
-2. Add detection entry to `SKILL.md` Priority 1 (config files) or Priority 2 (dependencies) tables
-3. Add a Read instruction for the new reference file in `SKILL.md`'s Integration Workflow
-4. Update the supported frameworks table in `README.md`
-5. Update detection priorities in `agents/watt-analyzer.md`
+1. Add release-specific framework guidance to the canonical Watt skill in `platformatic/platformatic` on the appropriate release branch.
+2. Update the supported frameworks table in `README.md` if needed.
+3. Update detection priorities in `agents/watt-analyzer.md` when applicable.
 
 ### Adding a New Workflow
 
-1. Add a routing entry to the Command Router table in `SKILL.md`
-2. Add a new `## Workflow Name` section to `SKILL.md` with step-by-step instructions
-3. For large workflows, create a reference file in `skills/watt/references/` and Read it from `SKILL.md`
-4. Update `README.md` with the new command
+For Watt, maintain workflows and references in the release-matched skill in `platformatic/platformatic`. Keep this repository's Watt discovery skill independent of release-specific APIs and configuration formats. For Kafka and Workflow, maintain instructions and references in their respective skill directories. Update `README.md` when user-facing capabilities change.
 
 ## Key Watt Facts
 
-These facts must stay accurate across all documentation files:
-
-- **Node.js requirement**: v22.19.0+
-- **watt.json schema URL pattern**: `https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json` (packages: `next`, `nuxt`, `react-router`, `tanstack`, `vite`, `node`, `remix`, `astro`, `php`)
-- **Environment variables in watt.json**: `{VAR_NAME}` (curly braces, no dollar sign)
-- **Internal service URLs in app code**: `http://{service-id}.plt.local`
-- **Composer service origins**: `internal://{service-id}`
-- **Worker naming**: directory name only (e.g. `"storefront"`, not `"web/storefront"`)
-- **Standard scripts**: `wattpm dev`, `wattpm build`, `wattpm start`
-- **Install**: `npm install wattpm` (plus framework-specific `@platformatic/*` package)
+- The installed `wattpm` release determines Node.js requirements, configuration formats, supported capabilities, and commands.
+- Use the project's local installation for `wattpm skill [FILE]`; do not implicitly download another release.
+- Resolve relative Markdown links against the referring document inside the bundled skill, not this repository or the working directory.
+- Do not restore duplicate Watt reference files or cross-repository synchronization workflows here.
 
 ## Git Conventions
 
