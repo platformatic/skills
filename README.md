@@ -7,7 +7,7 @@ Also available as a Claude Code plugin with slash commands (`/watt`, `/kafka`).
 ## Features
 
 - **Automatic Framework Detection**: Detects Next.js, Nuxt, React Router, TanStack Start, Vite, Express, Fastify, Koa, Remix, Astro, NestJS, WordPress, Laravel, and PHP
-- **Configuration Generation**: Creates optimized `watt.json` for your framework
+- **Release-Matched Guidance**: Uses the locally installed `wattpm` skill for configuration, APIs, and supported workflows
 - **Deployment Automation**: Generate Docker, Kubernetes, and cloud deployment configs
 - **Performance Optimization**: Multi-worker SSR, distributed caching, Kubernetes tuning, CPU profiling with `wattpm pprof`, flamegraph generation with `@platformatic/flame`, and heap snapshots
 - **Kafka Integration**: Event-driven microservices with kafka-hooks webhooks and migrations from KafkaJS or node-rdkafka (separate `kafka` skill)
@@ -38,11 +38,13 @@ claude --plugin-dir ./watt-skill
 
 ## Skills
 
-This repository contains two skills, each a standalone `SKILL.md` following the [Agent Skills specification](https://agentskills.io/specification):
+This repository contains three skills, each a standalone `SKILL.md` following the [Agent Skills specification](https://agentskills.io/specification):
 
 ### `watt` — Platformatic Watt Integration
 
-Detects your framework, generates `watt.json`, installs dependencies, and creates deployment configs.
+Delegates to `wattpm skill` from the project's local installation. Watt workflows and references ship with that package, so guidance follows the installed release rather than this repository's default branch. The agent retrieves linked Markdown files with `wattpm skill <file>`, resolving links relative to the referring document within the bundle.
+
+Requires Watt 3.74.0 or newer with the `skill` command. If the installed version is older than 3.74.0 or does not provide the command, the skill aborts the request without upgrading or substituting other documentation. For new projects, it establishes the target version before installation. It never implicitly downloads the latest major.
 
 **Capabilities**: init, deploy (Docker/Kubernetes/cloud), migrate, enterprise multi-service setup, wattpm CLI guidance, scheduled jobs, CMS integration, observability.
 
@@ -110,6 +112,8 @@ When loaded as a Claude Code plugin, the skills also expose slash commands with 
 
 ## Supported Frameworks
 
+The installed release's bundled instructions determine framework support and configuration. The following table lists framework detection signals; verify package compatibility against that release.
+
 | Framework | Package | Detection |
 |-----------|---------|-----------|
 | Next.js | `@platformatic/next` | `next.config.{js,ts,mjs}` |
@@ -131,46 +135,12 @@ Several frameworks build on Vite (React Router, TanStack Start, Remix, Astro) an
 
 ## Requirements
 
-- **Node.js**: v22.19.0 or higher
+- **Node.js**: A version supported by the installed `wattpm` release
+- **Watt skill**: A project-local `wattpm` installation with the `skill` command and an agent capable of executing local commands
 
 ## Configuration Reference
 
-### watt.json Structure
-
-```json
-{
-  "$schema": "https://schemas.platformatic.dev/@platformatic/{package}/3.0.0.json",
-  "application": {
-    "commands": {
-      "development": "your-dev-command",
-      "build": "your-build-command",
-      "production": "your-start-command"
-    }
-  },
-  "runtime": {
-    "logger": {
-      "level": "{PLT_SERVER_LOGGER_LEVEL}"
-    },
-    "server": {
-      "hostname": "{PLT_SERVER_HOSTNAME}",
-      "port": "{PORT}"
-    }
-  }
-}
-```
-
-### Runtime Placement Rule
-
-- **Single-config application schema** (`@platformatic/node`, `@platformatic/next`, `@platformatic/remix`, `@platformatic/astro`, `@platformatic/php`): use a `runtime` block for runtime settings (`logger`, `server`, `workers`, telemetry, etc.).
-- **Root multi-app orchestrator schema** (`watt` / `@platformatic/runtime`): keep runtime settings in the root-level `runtime` block.
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `PLT_SERVER_HOSTNAME` | Bind address | `0.0.0.0` |
-| `PLT_SERVER_LOGGER_LEVEL` | Log level | `info` |
+Load the local `wattpm skill` output and follow its configuration references. Configuration formats, environment handling, Node.js requirements, and available commands depend on the installed release. See [the Watt discovery skill](skills/watt/SKILL.md) for local CLI resolution and reference navigation.
 
 ## Project Structure
 
@@ -178,11 +148,7 @@ Several frameworks build on Vite (React Router, TanStack Start, Remix, Astro) an
 watt-skill/
 ├── skills/
 │   ├── watt/
-│   │   ├── SKILL.md             # Watt integration skill
-│   │   └── references/
-│   │       ├── frameworks/      # Framework-specific configs
-│   │       ├── deployment/      # Deployment guides
-│   │       └── troubleshooting.md
+│   │   └── SKILL.md             # Delegates to the project-local wattpm skill
 │   ├── kafka/
 │   │   ├── SKILL.md             # Kafka integration skill
 │   │   └── references/
@@ -233,24 +199,7 @@ For other agents, point your agent's skill configuration at the `skills/` direct
 
 ## Troubleshooting
 
-See [troubleshooting guide](skills/watt/references/troubleshooting.md) for common issues.
-
-### Quick Fixes
-
-**Node.js version too old:**
-```bash
-nvm install 22 && nvm use 22
-```
-
-**wattpm not found:**
-```bash
-npm install wattpm
-```
-
-**Port already in use:**
-```bash
-PORT=3001 npm run dev
-```
+Use the troubleshooting references returned by the local `wattpm skill`. If the installation is missing or the command is unsupported, follow [the discovery skill's fallback guidance](skills/watt/SKILL.md#missing-installations-older-releases-and-migrations).
 
 ## Resources
 
